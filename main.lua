@@ -1,5 +1,5 @@
 -- Загрузка библиотеки UI (Rayfield)
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Rayfield = loadstring(game:HttpGet('https://t.me/xryakovscript'))()
 
 -- Создание главного окна xryak
 local Window = Rayfield:CreateWindow({
@@ -120,26 +120,26 @@ end)
 -- ==========================================
 local HalloweenTab = Window:CreateTab("Halloween", 4483362458)
 
-HalloweenTab:CreateSection("Локации Хэллоуинского Ивента")
+HalloweenTab:CreateSection("Halloween Locations")
 
 local halloweenLocations = {
-    ["Новая точка Хэл. Ивента"] = Vector3.new(-262.0, 91.4, -1128.5),
-    ["Хэллоуинский отель"] = Vector3.new(-295.6, 42.5, -1434.3),
-    ["Гробница"] = Vector3.new(-334.4, 41.2, -1199.2),
-    ["Хэллоуинский цирк"] = Vector3.new(-316.9, 36.7, -1705.2)
+    ["Halloween Event"] = Vector3.new(-262.0, 91.4, -1128.5),
+    ["Halloween Tomb"] = Vector3.new(-334.4, 41.2, -1199.2),
+    ["Halloween Hotel"] = Vector3.new(-295.6, 42.5, -1434.3),
+    ["Halloween Circus"] = Vector3.new(-316.9, 36.7, -1705.2)
 }
 
-local selectedHalloweenPreset = "Новая точка Хэл. Ивента"
+local selectedHalloweenPreset = "Halloween Event"
 
 HalloweenTab:CreateDropdown({
-   Name = "Выберите локацию ивента",
+   Name = "Выберите локацию",
    Options = {
-       "Новая точка Хэл. Ивента",
-       "Хэллоуинский отель",
-       "Гробница",
-       "Хэллоуинский цирк"
+       "Halloween Event",
+       "Halloween Tomb",
+       "Halloween Hotel",
+       "Halloween Circus"
    },
-   CurrentOption = {"Новая точка Хэл. Ивента"},
+   CurrentOption = {"Halloween Event"},
    MultipleOptions = false,
    Flag = "HalloweenLocationsDropdown",
    Callback = function(Option)
@@ -148,13 +148,13 @@ HalloweenTab:CreateDropdown({
 })
 
 HalloweenTab:CreateButton({
-   Name = "Телепортироваться на ивент",
+   Name = "Телепортироваться",
    Callback = function()
       local targetPos = halloweenLocations[selectedHalloweenPreset]
       if targetPos then
           teleportTo(CFrame.new(targetPos))
           Rayfield:Notify({
-             Title = "Хэллоуин Телепорт",
+             Title = "Halloween Teleport",
              Content = "Перемещение в: " .. selectedHalloweenPreset,
              Duration = 3,
              Image = 4483362458,
