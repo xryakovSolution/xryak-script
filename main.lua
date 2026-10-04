@@ -1,398 +1,138 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
-local Window = Rayfield:CreateWindow({
-   Name = "xryak Hub | Adopt Me!",
-   LoadingTitle = "Загрузка xryak Hub...",
-   LoadingSubtitle = "by xryakovSolution",
-   ConfigurationSaving = { Enabled = false },
-   KeySystem = false
-})
-
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
--- ====================================================================
---  ПЕРЕМЕННЫЕ
--- ====================================================================
-local walkSpeed = 16
-local jumpPower = 50
-local isFlyEnabled = false
+-- Переменные для Fly
+local flying = false
 local flySpeed = 50
-local flyKeybind = Enum.KeyCode.F
-local isNoclipEnabled = false
-local isInfJumpEnabled = false
+local flyKey = Enum.KeyCode.E
+local bodyVelocity = nil
+local bodyGyro = nil
+local flyConnection = nil
 
-local autoGhostFarm = false
-local autoAcceptTeleport = true
+-- Таблица для сохраненных точек телепорта
+local customWaypoints = {}
+local waypointDropdown = nil
 
-local selectedPlayer = nil
-
--- ====================================================================
---  ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
--- ====================================================================
-
--- Безопасный выход из дома на главную карту
-local function ensureMainMap()
-    pcall(function()
-        local isHousing = Workspace:FindFirstChild("House") or Workspace:FindFirstChild("Housing")
-        if isHousing then
-            local API = ReplicatedStorage:FindFirstChild("API")
-            if API then
-                for _, remote in pairs(API:GetChildren()) do
-                    if string.find(string.lower(remote.Name), "location") or string.find(string.lower(remote.Name), "door") then
-                        if remote:IsA("RemoteFunction") then
-                            remote:InvokeServer("MainDoor", {["destination"] = "MainMap"})
-                        elseif remote:IsA("RemoteEvent") then
-                            remote:FireServer("MainDoor", {["destination"] = "MainMap"})
-                        end
-                    end
-                end
-            end
-            task.wait(2)
-        end
-    end)
-end
-
--- Авто-экипировка Бластера
-local function equipBlaster()
-    local char = LocalPlayer.Character
-    if not char then return nil end
-    local bp = LocalPlayer:FindFirstChild("Backpack")
-    
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool then return tool end
-    
-    if bp then
-        for _, item in pairs(bp:GetChildren()) do
-            if item:IsA("Tool") then
-                char.Humanoid:EquipTool(item)
-                return item
-            end
-        end
+-- Функция безопасной телепортации
+local function teleportTo(cframe)
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = cframe
     end
-    return nil
 end
 
--- МОДЕРНИЗИРОВАННЫЙ АВТО-YES (Прямой клик по GUI в Adopt Me)
-local function checkAndAcceptTeleport()
-    if not autoAcceptTeleport then return end
+-- Функция правильной загрузки основного мира Adopt Me!
+local function loadMainMap()
     pcall(function()
-        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-        if not playerGui then return end
-        
-        for _, gui in pairs(playerGui:GetChildren()) do
-            if gui:IsA("ScreenGui") and gui.Enabled then
-                -- Ищем диалоговые фреймы
-                local hasGhostText = false
-                for _, desc in pairs(gui:GetDescendants()) do
-                    if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and string.find(string.lower(desc.Text or ""), "ghost gallery") then
-                        hasGhostText = true
-                        break
-                    end
-                end
-                
-                if hasGhostText then
-                    for _, btn in pairs(gui:GetDescendants()) do
-                        if btn:IsA("TextButton") or btn:IsA("ImageButton") then
-                            local bText = btn:IsA("TextButton") and string.lower(btn.Text) or string.lower(btn.Name)
-                            if bText == "yes" or string.find(bText, "yes") or btn.Name == "YesButton" or btn.Name == "Confirm" then
-                                -- Принудительный клик по сигналу или виртуальной мыши
-                                if firesignal then
-                                    firesignal(btn.MouseButton1Click)
-                                    firesignal(btn.Activated)
-                                else
-                                    local pos = btn.AbsolutePosition + (btn.AbsoluteSize / 2)
-                                    VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
-                                    task.wait(0.05)
-                                    VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end)
-end
-
--- Вход в круг ожидания
-local function stepInWaitingCircle()
-    pcall(function()
-        local char = LocalPlayer.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        
-        for _, obj in pairs(Workspace:GetDescendants()) do
-            if obj:IsA("BasePart") then
-                local name = string.lower(obj.Name)
-                if string.find(name, "circle") or string.find(name, "zone") or string.find(name, "ring") or string.find(name, "pad") then
-                    if obj.Size.X > 5 and obj.Size.Z > 5 then
-                        char.HumanoidRootPart.CFrame = obj.CFrame + Vector3.new(0, 3, 0)
-                        return
-                    end
-                end
-            end
-        end
-    end)
-end
-
--- Логика фарма Ghost Gallery
-local function processGhostEvent()
-    if not autoGhostFarm then return end
-    
-    checkAndAcceptTeleport()
-    
-    pcall(function()
-        local char = LocalPlayer.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        
-        local hrp = char.HumanoidRootPart
-        local camera = Workspace.CurrentCamera
-        
-        local inMinigame = false
-        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-        if playerGui then
-            for _, gui in pairs(playerGui:GetChildren()) do
-                if gui:IsA("ScreenGui") and gui.Enabled then
-                    for _, label in pairs(gui:GetDescendants()) do
-                        if label:IsA("TextLabel") and (string.find(string.lower(label.Text), "score") or string.find(string.lower(label.Text), "ghost gallery")) then
-                            inMinigame = true
-                            break
-                        end
-                    end
-                end
-            end
-        end
-
-        if inMinigame then
-            equipBlaster()
-
-            -- 1. Поиск Призрака
-            local targetGhost = nil
-            for _, obj in pairs(Workspace:GetDescendants()) do
-                if obj:IsA("Model") and (string.find(string.lower(obj.Name), "ghost") or string.find(string.lower(obj.Name), "призрак")) then
-                    local part = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChildWhichIsA("BasePart")
-                    if part then
-                        targetGhost = part
-                        break
-                    end
-                end
-            end
-
-            if targetGhost then
-                hrp.CFrame = CFrame.new(targetGhost.Position + Vector3.new(0, 1, 6), targetGhost.Position)
-                camera.CFrame = CFrame.new(camera.CFrame.Position, targetGhost.Position)
-                VirtualInputManager:SendMouseButtonEvent(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2, 0, true, game, 0)
-                return
-            end
-
-            -- 2. Поиск Мебели
-            local targetProp = nil
-            for _, obj in pairs(Workspace:GetDescendants()) do
-                if obj:IsA("Model") or obj:IsA("BasePart") then
-                    local name = string.lower(obj.Name)
-                    if string.find(name, "furniture") or string.find(name, "chair") or string.find(name, "table") or string.find(name, "prop") or string.find(name, "breakable") then
-                        targetProp = obj
-                        break
-                    end
-                end
-            end
-
-            if targetProp then
-                local pPos = targetProp:IsA("Model") and targetProp:GetPivot().Position or targetProp.Position
-                hrp.CFrame = CFrame.new(pPos + Vector3.new(0, 2, 4), pPos)
-                camera.CFrame = CFrame.new(camera.CFrame.Position, pPos)
-                VirtualInputManager:SendMouseButtonEvent(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2, 0, true, game, 0)
-            end
-        else
-            VirtualInputManager:SendMouseButtonEvent(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2, 0, false, game, 0)
-            stepInWaitingCircle()
-        end
-    end)
-end
-
--- ====================================================================
---  ФИЗИКА И МОДИФИКАЦИИ (Fly с Биндами, Noclip, WalkSpeed)
--- ====================================================================
-
-RunService.Stepped:Connect(function()
-    pcall(function()
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("Humanoid") then
-            char.Humanoid.WalkSpeed = walkSpeed
-            char.Humanoid.JumpPower = jumpPower
-            
-            if isNoclipEnabled then
-                for _, part in pairs(char:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
-            end
-        end
-    end)
-end)
-
-UserInputService.JumpRequest:Connect(function()
-    if isInfJumpEnabled then
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("Humanoid") then
-            char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
-    end
-end)
-
--- ПЕРЕРАБОТАННЫЙ И ИСПРАВЛЕННЫЙ ФЛАЙ (FLY)
-local flyBodyVel, flyBodyGyro
-
+        local Fsys = require(ReplicatedStorage:WaitForChild("Fsys"))
+        local RouterClient = Fsys.load("RouterClient")
+-- Логика управления Fly
 local function startFly()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
     local hrp = char.HumanoidRootPart
     
-    flyBodyVel = Instance.new("BodyVelocity")
-    flyBodyVel.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-    flyBodyVel.Velocity = Vector3.new(0, 0, 0)
-    flyBodyVel.Parent = hrp
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Parent = hrp
     
-    flyBodyGyro = Instance.new("BodyGyro")
-    flyBodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
-    flyBodyGyro.P = 9e4
-    flyBodyGyro.CFrame = hrp.CFrame
-    flyBodyGyro.Parent = hrp
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+    bodyGyro.P = 9e4
+    bodyGyro.CFrame = hrp.CFrame
+    bodyGyro.Parent = hrp
+    
+    flying = true
+    
+    flyConnection = RunService.RenderStepped:Connect(function()
+        if not flying or not char or not char:FindFirstChild("HumanoidRootPart") then
+            if flyConnection then flyConnection:Disconnect() end
+            return
+        end
+        
+        local camera = workspace.CurrentCamera
+        local moveDir = Vector3.new(0, 0, 0)
+
+        -- Вызываем официальный переход игры на MainMap
+        RouterClient.get("LocationAPI/SetLocation"):FireServer("MainMap", "Shop", "MainDoor")
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDir = moveDir + camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDir = moveDir - camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDir = moveDir - camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDir = moveDir + camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDir = moveDir + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            moveDir = moveDir - Vector3.new(0, 1, 0)
+        end
+        
+        bodyGyro.CFrame = camera.CFrame
+        bodyVelocity.Velocity = moveDir * flySpeed
+    end)
 end
 
 local function stopFly()
-    if flyBodyVel then flyBodyVel:Destroy() flyBodyVel = nil end
-    if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
+    flying = false
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+    if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
+    if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
 end
 
--- Переключение флая по бинду
+-- Активация Fly по клавише
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == flyKeybind then
-        isFlyEnabled = not isFlyEnabled
-        if isFlyEnabled then
-            startFly()
-        else
+    if not gameProcessed and input.KeyCode == flyKey then
+        if flying then
             stopFly()
+            Rayfield:Notify({Title = "Fly", Content = "Полет отключен", Duration = 2})
+        else
+            startFly()
+            Rayfield:Notify({Title = "Fly", Content = "Полет включен", Duration = 2})
         end
     end
 end)
 
-RunService.RenderStepped:Connect(function()
-    if isFlyEnabled then
-        pcall(function()
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") and flyBodyVel and flyBodyGyro then
-                local cam = Workspace.CurrentCamera
-                flyBodyGyro.CFrame = cam.CFrame
-                
-                local moveDir = Vector3.new()
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
-                if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0, 1, 0) end
-
-                flyBodyVel.Velocity = moveDir * flySpeed
-            end
-        end)
-    end
-end)
-
--- ====================================================================
---  ВКЛАДКИ ИНТЕРФЕЙСА RAYFIELD
--- ====================================================================
-
--- 1. Новая прокачанная вкладка "Главная"
-local MainTab = Window:CreateTab("Главное", 4483362458)
-
-MainTab:CreateSection("Статус скрипта")
-MainTab:CreateLabel("Игрок: " .. LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")")
-
-MainTab:CreateSection("Быстрые действия")
-
-MainTab:CreateButton({
-   Name = "Выйти из дома на главную карту",
-   Callback = function()
-      ensureMainMap()
+-- ==========================================
+-- ВКЛАДКА: MAIN
+-- ==========================================
+@@ -72,71 +150,137 @@ MainTab:CreateSlider({
    end,
 })
 
-MainTab:CreateButton({
-   Name = "Экстренно выключить весь автофарм",
-   Callback = function()
-      autoGhostFarm = false
-      VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-      Rayfield:Notify({ Title = "xryak Hub", Content = "Автофарм полностью остановлен!", Duration = 3 })
-   end,
-})
+MainTab:CreateSection("Режим полета (Fly)")
 
-MainTab:CreateButton({
-   Name = "Перезапустить интерфейс скрипта",
-   Callback = function()
-      Rayfield:Destroy()
-   end,
-})
-
--- 2. Вкладка "Персонаж"
-local PlayerTab = Window:CreateTab("Персонаж", 4483362458)
-
-PlayerTab:CreateSlider({
-   Name = "Скорость бега (WalkSpeed)",
-   Range = {16, 200},
-   Increment = 1,
-   Suffix = "Speed",
-   CurrentValue = 16,
-   Flag = "SpeedSlider",
-   Callback = function(Value)
-      walkSpeed = Value
-   end,
-})
-
-PlayerTab:CreateSlider({
-   Name = "Высота прыжка (JumpPower)",
-   Range = {50, 300},
-   Increment = 1,
-   Suffix = "Power",
-   CurrentValue = 50,
-   Flag = "JumpSlider",
-   Callback = function(Value)
-      jumpPower = Value
-   end,
-})
-
-PlayerTab:CreateToggle({
-   Name = "Режим полета (Fly)",
+MainTab:CreateToggle({
+   Name = "Включить Полет (Fly)",
    CurrentValue = false,
    Flag = "FlyToggle",
    Callback = function(Value)
-      isFlyEnabled = Value
-      if Value then startFly() else stopFly() end
+      if Value then
+          if not flying then startFly() end
+      else
+          if flying then stopFly() end
+      end
    end,
 })
 
-PlayerTab:CreateKeybind({
-   Name = "Бинд на Флай (Включить / Выключить)",
-   CurrentKeybind = "F",
-   HoldToInteract = false,
-   Flag = "FlyKeybind",
-   Callback = function(Keybind)
-      flyKeybind = Keybind
-   end,
-})
-
-PlayerTab:CreateSlider({
+MainTab:CreateSlider({
    Name = "Скорость полета",
-   Range = {20, 200},
+   Range = {20, 300},
    Increment = 5,
-   Suffix = "Speed",
+   Suffix = " Speed",
    CurrentValue = 50,
    Flag = "FlySpeedSlider",
    Callback = function(Value)
@@ -400,148 +140,167 @@ PlayerTab:CreateSlider({
    end,
 })
 
-PlayerTab:CreateToggle({
-   Name = "Проход сквозь стены (Noclip)",
-   CurrentValue = false,
-   Flag = "NoclipToggle",
-   Callback = function(Value)
-      isNoclipEnabled = Value
+MainTab:CreateKeybind({
+   Name = "Бинд переключения полета",
+   CurrentKeybind = "E",
+   HoldToInteract = false,
+   Flag = "FlyKeybind",
+   Callback = function(Keybind)
+      flyKey = Enum.KeyCode[Keybind]
    end,
 })
 
-PlayerTab:CreateToggle({
-   Name = "Бесконечный прыжок (Inf Jump)",
-   CurrentValue = false,
-   Flag = "InfJumpToggle",
-   Callback = function(Value)
-      isInfJumpEnabled = Value
+-- ==========================================
+-- ВКЛАДКА: TELEPORTS (ТЕЛЕПОРТАЦИЯ)
+-- ВКЛАДКА: TELEPORTS (СВОИ ТОЧКИ)
+-- ==========================================
+local TeleportTab = Window:CreateTab("Teleports", 4483362458)
+
+TeleportTab:CreateSection("Переход в Главный Город")
+TeleportTab:CreateSection("Сохранение собственных точек")
+
+TeleportTab:CreateButton({
+   Name = "Загрузить Главный Город (Main Map)",
+   Callback = function()
+      loadMainMap()
+      Rayfield:Notify({
+         Title = "Телепорт",
+         Content = "Загружаем основной мир...",
+         Duration = 3,
+         Image = 4483362458,
+      })
+local newWaypointName = "Точка 1"
+local selectedWaypoint = ""
+
+TeleportTab:CreateInput({
+   Name = "Название новой точки",
+   PlaceholderText = "Введите название...",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+      newWaypointName = Text
    end,
 })
 
--- 3. Вкладка "Halloween Event"
-local EventTab = Window:CreateTab("Halloween Event", 4483362458)
+local coordsInput = nil
 
-EventTab:CreateToggle({
-   Name = "Авто-принятие Телепорта (Кнопка YES)",
-   CurrentValue = true,
-   Flag = "AutoAcceptToggle",
-   Callback = function(Value)
-      autoAcceptTeleport = Value
-   end,
-})
-
-EventTab:CreateToggle({
-   Name = "Авто-Фарм Ghost Gallery (Призраки + Мебель)",
-   CurrentValue = false,
-   Flag = "AutoGhostFarmToggle",
-   Callback = function(Value)
-      autoGhostFarm = Value
-      if not Value then
-          VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+TeleportTab:CreateButton({
+   Name = "Подняться на карту (Выбраться из пустоты)",
+   Name = "Сохранить текущую позицию",
+   Callback = function()
+      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+         local currentCFrame = LocalPlayer.Character.HumanoidRootPart.CFrame
+         LocalPlayer.Character.HumanoidRootPart.CFrame = currentCFrame + Vector3.new(0, 500, 0)
+          local pos = LocalPlayer.Character.HumanoidRootPart.Position
+          local posStr = string.format("%.1f, %.1f, %.1f", pos.X, pos.Y, pos.Z)
+          
+          customWaypoints[newWaypointName] = LocalPlayer.Character.HumanoidRootPart.CFrame
+          
+          -- Обновляем список выбора
+          local keys = {}
+          for k in pairs(customWaypoints) do
+              table.insert(keys, k)
+          end
+          
+          waypointDropdown:Refresh(keys, true)
+          selectedWaypoint = newWaypointName
+          
+          if coordsInput then
+              coordsInput:Set(posStr)
+          end
+          
+          Rayfield:Notify({
+             Title = "Точка сохранена",
+             Content = string.format("Сохранено: %s (%s)", newWaypointName, posStr),
+             Duration = 4,
+             Image = 4483362458,
+          })
       end
    end,
 })
 
--- 4. Вкладка Телепортов
-local TeleportTab = Window:CreateTab("Телепорты", 4483362458)
+TeleportTab:CreateSection("Точные координаты (Основная карта)")
 
-local mainLocations = {
-    ["Больница"] = Vector3.new(292.0, 31.0, -1451.0),
-    ["Школа"] = Vector3.new(-180.0, 31.0, -1400.0),
-    ["Пиццерия"] = Vector3.new(-120.0, 31.0, -1180.0),
-    ["Кошачье кафе"] = Vector3.new(150.0, 31.0, -1100.0),
-    ["Магазин питомцев"] = Vector3.new(-200.0, 31.0, -1600.0),
-    ["Кемпинг"] = Vector3.new(-900.0, 31.0, -1100.0),
-    ["Пляж"] = Vector3.new(-550.0, 31.0, -1700.0),
-    ["Трейдинг Хаб"] = Vector3.new(245.0, 35.0, -1650.0)
+-- Координаты с учетом реальной высоты карты в Adopt Me
+local locations = {
+    ["Центр / Nursery"] = Vector3.new(-242, 30, -1742),
+    ["Больница (Hospital)"] = Vector3.new(-290, 30, -1770),
+    ["Школа (School)"] = Vector3.new(-330, 30, -1450),
+    ["Зоомагазин (Pet Shop)"] = Vector3.new(-110, 30, -1650),
+    ["Игровая площадка (Playground)"] = Vector3.new(-215, 30, -1660),
+    ["Пляж (Beach)"] = Vector3.new(-980, 25, -1400),
+    ["Пиццерия (Pizza Shop)"] = Vector3.new(-120, 30, -1350)
 }
 
+local selectedLocation = "Центр / Nursery"
+
 TeleportTab:CreateDropdown({
-   Name = "Телепорт по локациям",
-   Options = {"Больница", "Школа", "Пиццерия", "Кошачье кафе", "Магазин питомцев", "Кемпинг", "Пляж", "Трейдинг Хаб"},
-   CurrentOption = {"Больница"},
+   Name = "Выберите локацию",
+   Options = {"Центр / Nursery", "Больница (Hospital)", "Школа (School)", "Зоомагазин (Pet Shop)", "Игровая площадка (Playground)", "Пляж (Beach)", "Пиццерия (Pizza Shop)"},
+   CurrentOption = {"Центр / Nursery"},
+TeleportTab:CreateSection("Управление точками")
+
+waypointDropdown = TeleportTab:CreateDropdown({
+   Name = "Выберите сохраненную точку",
+   Options = {"Нет сохраненных точек"},
+   CurrentOption = {"Нет сохраненных точек"},
    MultipleOptions = false,
-   Flag = "LocationDropdown",
+   Flag = "TeleportDropdown",
+   Flag = "CustomWaypointsDropdown",
    Callback = function(Option)
-      ensureMainMap()
-      local selected = type(Option) == "table" and Option[1] or Option
-      local pos = mainLocations[selected]
-      if pos and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-         LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(pos)
+      selectedLocation = Option[1]
+      selectedWaypoint = Option[1]
+      local cf = customWaypoints[selectedWaypoint]
+      if cf and coordsInput then
+          local pos = cf.Position
+          coordsInput:Set(string.format("%.1f, %.1f, %.1f", pos.X, pos.Y, pos.Z))
       end
    end,
 })
 
-TeleportTab:CreateButton({
-   Name = "Прямой переход в Трейдинг Хаб (Remote)",
-   Callback = function()
-      ensureMainMap()
-      pcall(function()
-         local API = ReplicatedStorage:FindFirstChild("API")
-         if API then
-            for _, remote in pairs(API:GetChildren()) do
-               if string.find(string.lower(remote.Name), "location") or string.find(string.lower(remote.Name), "door") then
-                  if remote:IsA("RemoteFunction") then
-                     remote:InvokeServer("TradingHubDoor", {["destination"] = "TradingHub"})
-                  elseif remote:IsA("RemoteEvent") then
-                     remote:FireServer("TradingHubDoor", {["destination"] = "TradingHub"})
-                  end
-               end
-            end
-         end
-      end)
-   end,
-})
-
--- Телепорт к игрокам
-local function getPlayerList()
-    local plrs = {}
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            table.insert(plrs, p.Name)
-        end
-    end
-    return #plrs > 0 and plrs or {"Нет игроков"}
-end
-
-local playerDropdown = TeleportTab:CreateDropdown({
-   Name = "Выберите игрока",
-   Options = getPlayerList(),
-   CurrentOption = {""},
-   MultipleOptions = false,
-   Flag = "PlayerDropdown",
-   Callback = function(Option)
-      selectedPlayer = type(Option) == "table" and Option[1] or Option
-   end,
+coordsInput = TeleportTab:CreateInput({
+   Name = "Координаты выданной точки",
+   PlaceholderText = "Здесь появятся координаты...",
+   RemoveTextAfterFocusLost = false,
+   Callback = function() end,
 })
 
 TeleportTab:CreateButton({
-   Name = "Телепортироваться к игроку",
+   Name = "Телепортироваться",
+   Name = "Телепортироваться к выбранной точке",
    Callback = function()
-      if selectedPlayer and Players:FindFirstChild(selectedPlayer) then
-         local target = Players[selectedPlayer].Character
-         if target and target:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character then
-            LocalPlayer.Character.HumanoidRootPart.CFrame = target.HumanoidRootPart.CFrame + Vector3.new(0, 2, 0)
-         end
-      end
+      local targetPos = locations[selectedLocation]
+      if targetPos then
+          teleportTo(CFrame.new(targetPos))
+      local cf = customWaypoints[selectedWaypoint]
+      if cf then
+          teleportTo(cf)
+          Rayfield:Notify({
+             Title = "Телепорт",
+             Content = "Перемещение в: " .. selectedLocation,
+             Content = "Телепортированы на точку: " .. selectedWaypoint,
+             Duration = 3,
+             Image = 4483362458,
+          })
+      else
+          Rayfield:Notify({
+             Title = "Ошибка",
+             Content = "Выбранная точка не найдена!",
+             Duration = 3,
+             Image = 4483362458,
+          })
+@@ -151,14 +295,13 @@ TeleportTab:CreateButton({
+   Callback = function()
+      Rayfield:Notify({
+         Title = "Click TP",
+         Content = "Зажмите Ctrl и нажмите ЛКМ по поверхности.",
+         Content = "Зажмите Ctrl и кликните по поверхности.",
+         Duration = 4,
+         Image = 4483362458,
+      })
    end,
 })
 
-TeleportTab:CreateButton({
-   Name = "Обновить список игроков",
-   Callback = function()
-      playerDropdown:Refresh(getPlayerList())
-   end,
-})
-
--- Цикл работы автофарма
-task.spawn(function()
-    while true do
-        if autoGhostFarm then
-            processGhostEvent()
-        else
-            checkAndAcceptTeleport()
-        end
-        task.wait(0.1)
-    end
-end)
+-- Логика телепорта по Ctrl + Click
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.UserInputType == Enum.UserInputType.MouseButton1 and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+        local mouse = LocalPlayer:GetMouse()
