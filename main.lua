@@ -9,16 +9,19 @@ local Window = Rayfield:CreateWindow({
    ConfigurationSaving = {
       Enabled = false,
    },
-   KeySystem = false -- Систему ключей пока отключили
+   KeySystem = false
 })
 
--- Создаём вкладку "Main" (Главная)
-local MainTab = Window:CreateTab("Main", 4483362458) -- Иконка вкладки
+-- Переменные для автофарма
+local autoFarmPet = false
 
--- Раздел с настройками персонажа
+-- ==========================================
+-- ВКЛАДКА: MAIN
+-- ==========================================
+local MainTab = Window:CreateTab("Main", 4483362458)
+
 MainTab:CreateSection("Настройки игрока")
 
--- Слайдер для управления скоростью ходьбы (WalkSpeed)
 MainTab:CreateSlider({
    Name = "Скорость ходьбы (WalkSpeed)",
    Range = {16, 250},
@@ -31,7 +34,6 @@ MainTab:CreateSlider({
    end,
 })
 
--- Слайдер для управления высотой прыжка (JumpPower)
 MainTab:CreateSlider({
    Name = "Сила прыжка (JumpPower)",
    Range = {50, 300},
@@ -44,16 +46,50 @@ MainTab:CreateSlider({
    end,
 })
 
--- Переключатель (Toggle) для полного сброса параметров
-MainTab:CreateButton({
-   Name = "Сбросить параметры (Default)",
-   Callback = function()
-      game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = 16
-      game.Players.LocalPlayer.Character.Humanoid.JumpPower = 50
+-- ==========================================
+-- ВКЛАДКА: AUTO FARM
+-- ==========================================
+local FarmTab = Window:CreateTab("Auto Farm", 4483362458)
+
+FarmTab:CreateSection("Автоматизация питомцев")
+
+FarmTab:CreateToggle({
+   Name = "Авто-выполнение потребностей питомца",
+   CurrentValue = false,
+   Flag = "AutoPetFarmToggle",
+   Callback = function(Value)
+      autoFarmPet = Value
+      if autoFarmPet then
+         Rayfield:Notify({
+            Title = "xryak Auto Farm",
+            Content = "Автофарм питомца включён!",
+            Duration = 3,
+            Image = 4483362458,
+         })
+      else
+         Rayfield:Notify({
+            Title = "xryak Auto Farm",
+            Content = "Автофарм выключен.",
+            Duration = 3,
+            Image = 4483362458,
+         })
+      end
    end,
 })
 
--- Отправляем уведомление о готовности
+-- Фоновый цикл автофарма
+task.spawn(function()
+   while true do
+      if autoFarmPet then
+         -- ЗДЕСЬ БУДЕТ ЛОГИКА ДЛЯ КОНКРЕТНОЙ ИГРЫ
+         -- Например: проверка потребностей (сон, еда, купание) и вызов RemoteEvents
+         print("[xryak] Проверка потребностей питомца...")
+      end
+      task.wait(5) -- Проверка каждые 5 секунд
+   end
+end)
+
+-- Отправляем уведомление
 Rayfield:Notify({
    Title = "xryak Loaded",
    Content = "Интерфейс успешно загружен!",
