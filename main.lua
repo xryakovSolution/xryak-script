@@ -1,5 +1,5 @@
 -- Загрузка библиотеки UI (Rayfield)
-local Rayfield = loadstring(game:HttpGet('https://t.me/xryakovscript'))()
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- Создание главного окна xryak
 local Window = Rayfield:CreateWindow({
