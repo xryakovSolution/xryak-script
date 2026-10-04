@@ -2,7 +2,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
    Name = "xryak Hub | Adopt Me!",
-   LoadingTitle = "Загрузка xryak...",
+   LoadingTitle = "Загрузка xryak Hub...",
    LoadingSubtitle = "by xryakovSolution",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false
@@ -17,12 +17,13 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
 -- ====================================================================
---  ПЕРЕМЕННЫЕ СОСТОЯНИЙ (Player, Event & AutoFarm)
+--  ПЕРЕМЕННЫЕ
 -- ====================================================================
 local walkSpeed = 16
 local jumpPower = 50
 local isFlyEnabled = false
 local flySpeed = 50
+local flyKeybind = Enum.KeyCode.F
 local isNoclipEnabled = false
 local isInfJumpEnabled = false
 
@@ -30,7 +31,6 @@ local autoGhostFarm = false
 local autoAcceptTeleport = true
 
 local selectedPlayer = nil
-local selectedPet = nil
 
 -- ====================================================================
 --  ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
@@ -78,7 +78,7 @@ local function equipBlaster()
     return nil
 end
 
--- Авто-нажатие кнопки YES на приглашение ивента
+-- МОДЕРНИЗИРОВАННЫЙ АВТО-YES (Прямой клик по GUI в Adopt Me)
 local function checkAndAcceptTeleport()
     if not autoAcceptTeleport then return end
     pcall(function()
@@ -87,21 +87,29 @@ local function checkAndAcceptTeleport()
         
         for _, gui in pairs(playerGui:GetChildren()) do
             if gui:IsA("ScreenGui") and gui.Enabled then
-                for _, btn in pairs(gui:GetDescendants()) do
-                    if btn:IsA("TextButton") or btn:IsA("ImageButton") then
-                        local text = btn:IsA("TextButton") and string.lower(btn.Text) or ""
-                        if text == "yes" or btn.Name == "Yes" or btn.Name == "ConfirmButton" then
-                            for _, sample in pairs(gui:GetDescendants()) do
-                                if sample:IsA("TextLabel") and string.find(string.lower(sample.Text), "ghost gallery") then
-                                    if firesignal then
-                                        firesignal(btn.MouseButton1Click)
-                                    else
-                                        local pos = btn.AbsolutePosition + (btn.AbsoluteSize / 2)
-                                        VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
-                                        task.wait(0.05)
-                                        VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
-                                    end
-                                    break
+                -- Ищем диалоговые фреймы
+                local hasGhostText = false
+                for _, desc in pairs(gui:GetDescendants()) do
+                    if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and string.find(string.lower(desc.Text or ""), "ghost gallery") then
+                        hasGhostText = true
+                        break
+                    end
+                end
+                
+                if hasGhostText then
+                    for _, btn in pairs(gui:GetDescendants()) do
+                        if btn:IsA("TextButton") or btn:IsA("ImageButton") then
+                            local bText = btn:IsA("TextButton") and string.lower(btn.Text) or string.lower(btn.Name)
+                            if bText == "yes" or string.find(bText, "yes") or btn.Name == "YesButton" or btn.Name == "Confirm" then
+                                -- Принудительный клик по сигналу или виртуальной мыши
+                                if firesignal then
+                                    firesignal(btn.MouseButton1Click)
+                                    firesignal(btn.Activated)
+                                else
+                                    local pos = btn.AbsolutePosition + (btn.AbsoluteSize / 2)
+                                    VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
+                                    task.wait(0.05)
+                                    VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
                                 end
                             end
                         end
@@ -112,7 +120,7 @@ local function checkAndAcceptTeleport()
     end)
 end
 
--- Вход в круг ожидания (NEXT GAME IN: 00:10)
+-- Вход в круг ожидания
 local function stepInWaitingCircle()
     pcall(function()
         local char = LocalPlayer.Character
@@ -132,7 +140,7 @@ local function stepInWaitingCircle()
     end)
 end
 
--- Логика фарма ивента
+-- Логика фарма Ghost Gallery
 local function processGhostEvent()
     if not autoGhostFarm then return end
     
@@ -208,10 +216,9 @@ local function processGhostEvent()
 end
 
 -- ====================================================================
---  ФИЗИКА И МОДИФИКАЦИИ ИГРОКА (Fly, Noclip, Speed, InfJump)
+--  ФИЗИКА И МОДИФИКАЦИИ (Fly с Биндами, Noclip, WalkSpeed)
 -- ====================================================================
 
--- Обработчик Скорости и Прыжка
 RunService.Stepped:Connect(function()
     pcall(function()
         local char = LocalPlayer.Character
@@ -230,7 +237,6 @@ RunService.Stepped:Connect(function()
     end)
 end)
 
--- Бесконечный прыжок
 UserInputService.JumpRequest:Connect(function()
     if isInfJumpEnabled then
         local char = LocalPlayer.Character
@@ -240,26 +246,50 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
--- Логика Полета (Fly)
+-- ПЕРЕРАБОТАННЫЙ И ИСПРАВЛЕННЫЙ ФЛАЙ (FLY)
 local flyBodyVel, flyBodyGyro
+
+local function startFly()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = char.HumanoidRootPart
+    
+    flyBodyVel = Instance.new("BodyVelocity")
+    flyBodyVel.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    flyBodyVel.Velocity = Vector3.new(0, 0, 0)
+    flyBodyVel.Parent = hrp
+    
+    flyBodyGyro = Instance.new("BodyGyro")
+    flyBodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+    flyBodyGyro.P = 9e4
+    flyBodyGyro.CFrame = hrp.CFrame
+    flyBodyGyro.Parent = hrp
+end
+
+local function stopFly()
+    if flyBodyVel then flyBodyVel:Destroy() flyBodyVel = nil end
+    if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
+end
+
+-- Переключение флая по бинду
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == flyKeybind then
+        isFlyEnabled = not isFlyEnabled
+        if isFlyEnabled then
+            startFly()
+        else
+            stopFly()
+        end
+    end
+end)
+
 RunService.RenderStepped:Connect(function()
     if isFlyEnabled then
         pcall(function()
             local char = LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                local hrp = char.HumanoidRootPart
+            if char and char:FindFirstChild("HumanoidRootPart") and flyBodyVel and flyBodyGyro then
                 local cam = Workspace.CurrentCamera
-                
-                if not flyBodyVel then
-                    flyBodyVel = Instance.new("BodyVelocity", hrp)
-                    flyBodyVel.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-                end
-                if not flyBodyGyro then
-                    flyBodyGyro = Instance.new("BodyGyro", hrp)
-                    flyBodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
-                    flyBodyGyro.P = 9e4
-                end
-
                 flyBodyGyro.CFrame = cam.CFrame
                 
                 local moveDir = Vector3.new()
@@ -273,9 +303,6 @@ RunService.RenderStepped:Connect(function()
                 flyBodyVel.Velocity = moveDir * flySpeed
             end
         end)
-    else
-        if flyBodyVel then flyBodyVel:Destroy() flyBodyVel = nil end
-        if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
     end
 end)
 
@@ -283,9 +310,14 @@ end)
 --  ВКЛАДКИ ИНТЕРФЕЙСА RAYFIELD
 -- ====================================================================
 
--- 1. Главная
+-- 1. Новая прокачанная вкладка "Главная"
 local MainTab = Window:CreateTab("Главное", 4483362458)
-MainTab:CreateLabel("xryak Hub | Скрипт активен")
+
+MainTab:CreateSection("Статус скрипта")
+MainTab:CreateLabel("Игрок: " .. LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")")
+
+MainTab:CreateSection("Быстрые действия")
+
 MainTab:CreateButton({
    Name = "Выйти из дома на главную карту",
    Callback = function()
@@ -293,7 +325,23 @@ MainTab:CreateButton({
    end,
 })
 
--- 2. Вкладка Игрока (Скорость, Прыжок, Полет, Ноуклип)
+MainTab:CreateButton({
+   Name = "Экстренно выключить весь автофарм",
+   Callback = function()
+      autoGhostFarm = false
+      VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+      Rayfield:Notify({ Title = "xryak Hub", Content = "Автофарм полностью остановлен!", Duration = 3 })
+   end,
+})
+
+MainTab:CreateButton({
+   Name = "Перезапустить интерфейс скрипта",
+   Callback = function()
+      Rayfield:Destroy()
+   end,
+})
+
+-- 2. Вкладка "Персонаж"
 local PlayerTab = Window:CreateTab("Персонаж", 4483362458)
 
 PlayerTab:CreateSlider({
@@ -326,6 +374,17 @@ PlayerTab:CreateToggle({
    Flag = "FlyToggle",
    Callback = function(Value)
       isFlyEnabled = Value
+      if Value then startFly() else stopFly() end
+   end,
+})
+
+PlayerTab:CreateKeybind({
+   Name = "Бинд на Флай (Включить / Выключить)",
+   CurrentKeybind = "F",
+   HoldToInteract = false,
+   Flag = "FlyKeybind",
+   Callback = function(Keybind)
+      flyKeybind = Keybind
    end,
 })
 
@@ -359,7 +418,7 @@ PlayerTab:CreateToggle({
    end,
 })
 
--- 3. Вкладка Ивента (Ghost Gallery)
+-- 3. Вкладка "Halloween Event"
 local EventTab = Window:CreateTab("Halloween Event", 4483362458)
 
 EventTab:CreateToggle({
@@ -383,7 +442,7 @@ EventTab:CreateToggle({
    end,
 })
 
--- 4. Вкладка Телепортов (Локации, Игроки, Питомцы)
+-- 4. Вкладка Телепортов
 local TeleportTab = Window:CreateTab("Телепорты", 4483362458)
 
 local mainLocations = {
@@ -434,7 +493,7 @@ TeleportTab:CreateButton({
    end,
 })
 
--- Телепорт к игроку
+-- Телепорт к игрокам
 local function getPlayerList()
     local plrs = {}
     for _, p in pairs(Players:GetPlayers()) do
@@ -475,11 +534,13 @@ TeleportTab:CreateButton({
    end,
 })
 
--- Фоновый поток автофарма
+-- Цикл работы автофарма
 task.spawn(function()
     while true do
         if autoGhostFarm then
             processGhostEvent()
+        else
+            checkAndAcceptTeleport()
         end
         task.wait(0.1)
     end
