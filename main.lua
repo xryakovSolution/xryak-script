@@ -1,7 +1,5 @@
--- Загрузка библиотеки UI (Rayfield)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Создание главного окна xryak
 local Window = Rayfield:CreateWindow({
    Name = "xryak Hub | Adopt Me!",
    LoadingTitle = "Загрузка xryak...",
@@ -12,15 +10,17 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false
 })
 
--- Переменные
 local autoFarmPet = false
+local autoGhostFarm = false
+local autoOpenTombs = false
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- Переменные для Fly
 local flying = false
 local flySpeed = 50
 local flyKey = Enum.KeyCode.E
@@ -28,18 +28,15 @@ local bodyVelocity = nil
 local bodyGyro = nil
 local flyConnection = nil
 
--- Таблица для сохраненных кастомных точек телепорта
 local customWaypoints = {}
 local waypointDropdown = nil
 
--- Функция безопасной телепортации
 local function teleportTo(cframe)
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         LocalPlayer.Character.HumanoidRootPart.CFrame = cframe
     end
 end
 
--- Логика управления Fly
 local function startFly()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
@@ -65,27 +62,15 @@ local function startFly()
             return
         end
         
-        local camera = workspace.CurrentCamera
+        local camera = Workspace.CurrentCamera
         local moveDir = Vector3.new(0, 0, 0)
         
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            moveDir = moveDir + camera.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            moveDir = moveDir - camera.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            moveDir = moveDir - camera.CFrame.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            moveDir = moveDir + camera.CFrame.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            moveDir = moveDir + Vector3.new(0, 1, 0)
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-            moveDir = moveDir - Vector3.new(0, 1, 0)
-        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0, 1, 0) end
         
         bodyGyro.CFrame = camera.CFrame
         bodyVelocity.Velocity = moveDir * flySpeed
@@ -102,7 +87,6 @@ local function stopFly()
     if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
 end
 
--- Активация Fly по клавише
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == flyKey then
         if flying then
@@ -115,10 +99,41 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- ==========================================
--- ВКЛАДКА 1: HALLOWEEN (ПЕРВАЯ ВКЛАДКА)
--- ==========================================
 local HalloweenTab = Window:CreateTab("Halloween", 4483362458)
+
+HalloweenTab:CreateSection("План 1: Фарм Ивента (Охота на призрака)")
+
+HalloweenTab:CreateToggle({
+   Name = "Авто-фарм Ивента (Призрак + Бластер)",
+   CurrentValue = false,
+   Flag = "AutoGhostFarmToggle",
+   Callback = function(Value)
+      autoGhostFarm = Value
+      Rayfield:Notify({
+         Title = "Halloween Event",
+         Content = Value and "Авто-фарм призрака запущен!" or "Авто-фарм призрака остановлен.",
+         Duration = 3,
+         Image = 4483362458,
+      })
+   end,
+})
+
+HalloweenTab:CreateSection("План 2: Открытие Гробов в Гробнице")
+
+HalloweenTab:CreateToggle({
+   Name = "Авто-открытие Гробов",
+   CurrentValue = false,
+   Flag = "AutoOpenTombsToggle",
+   Callback = function(Value)
+      autoOpenTombs = Value
+      Rayfield:Notify({
+         Title = "Halloween Tomb",
+         Content = Value and "Авто-открытие гробов включено!" or "Авто-открытие гробов выключено.",
+         Duration = 3,
+         Image = 4483362458,
+      })
+   end,
+})
 
 HalloweenTab:CreateSection("Halloween Locations")
 
@@ -163,9 +178,6 @@ HalloweenTab:CreateButton({
    end,
 })
 
--- ==========================================
--- ВКЛАДКА 2: MAIN
--- ==========================================
 local MainTab = Window:CreateTab("Main", 4483362458)
 
 MainTab:CreateSection("Настройки игрока")
@@ -235,9 +247,6 @@ MainTab:CreateKeybind({
    end,
 })
 
--- ==========================================
--- ВКЛАДКА 3: TELEPORTS
--- ==========================================
 local TeleportTab = Window:CreateTab("Teleports", 4483362458)
 
 TeleportTab:CreateSection("Основные Локации Города")
@@ -289,7 +298,6 @@ TeleportTab:CreateButton({
    end,
 })
 
--- --- СЕКЦИЯ: СОБСТВЕННЫЕ ТОЧКИ ---
 TeleportTab:CreateSection("Сохранение собственных точек")
 
 local newWaypointName = "Точка 1"
@@ -408,9 +416,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- ==========================================
--- ВКЛАДКА 4: AUTO FARM (ADOPT ME!)
--- ==========================================
 local FarmTab = Window:CreateTab("Auto Farm", 4483362458)
 
 FarmTab:CreateSection("Автофарм питомцев")
@@ -421,25 +426,15 @@ FarmTab:CreateToggle({
    Flag = "AutoPetFarmToggle",
    Callback = function(Value)
       autoFarmPet = Value
-      if autoFarmPet then
-         Rayfield:Notify({
-            Title = "xryak Auto Farm",
-            Content = "Автофарм запущен!",
-            Duration = 3,
-            Image = 4483362458,
-         })
-      else
-         Rayfield:Notify({
-            Title = "xryak Auto Farm",
-            Content = "Автофарм остановлен.",
-            Duration = 3,
-            Image = 4483362458,
-         })
-      end
+      Rayfield:Notify({
+         Title = "xryak Auto Farm",
+         Content = Value and "Автофарм запущен!" or "Автофарм остановлен.",
+         Duration = 3,
+         Image = 4483362458,
+      })
    end,
 })
 
--- Функция автоматического поиска и выполнения нужд
 local function doPetFarm()
    pcall(function()
       local API = ReplicatedStorage:FindFirstChild("API")
@@ -458,17 +453,158 @@ local function doPetFarm()
    end)
 end
 
--- Фоновый поток автофарма
+local function equipBlaster()
+   pcall(function()
+      local char = LocalPlayer.Character
+      local bp = LocalPlayer:FindFirstChild("Backpack")
+      if not char then return end
+      
+      local blaster = bp:FindFirstChild("Blaster") or char:FindFirstChild("Blaster")
+      if not blaster then
+         for _, item in pairs(bp:GetChildren()) do
+            if string.find(string.lower(item.Name), "blaster") or string.find(string.lower(item.Name), "ghost") then
+               blaster = item
+               break
+            end
+         end
+      end
+      if blaster and blaster.Parent == bp then
+         LocalPlayer.Character.Humanoid:EquipTool(blaster)
+      end
+   end)
+end
+
+local function processGhostFarm()
+   if not autoGhostFarm then return end
+   pcall(function()
+      equipBlaster()
+      
+      local char = LocalPlayer.Character
+      if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+      
+      local ghost = nil
+      local breakableObj = nil
+      
+      for _, obj in pairs(Workspace:GetDescendants()) do
+         if obj:IsA("Model") and (string.find(string.lower(obj.Name), "ghost") or string.find(string.lower(obj.Name), " призрак")) then
+            ghost = obj
+            break
+         end
+      end
+      
+      if not ghost then
+         for _, obj in pairs(Workspace:GetDescendants()) do
+            if obj:IsA("BasePart") or obj:IsA("Model") then
+               if obj:getAttribute("Breakable") or string.find(string.lower(obj.Name), "breakable") or string.find(string.lower(obj.Name), "furniture") then
+                  breakableObj = obj
+                  break
+               end
+            end
+         end
+      end
+
+      local API = ReplicatedStorage:FindFirstChild("API")
+
+      if ghost then
+         local ghostPart = ghost:FindFirstChild("HumanoidRootPart") or ghost:FindFirstChildWhichIsA("BasePart")
+         if ghostPart then
+            char.HumanoidRootPart.CFrame = ghostPart.CFrame * CFrame.new(0, 0, 4)
+            Workspace.CurrentCamera.CFrame = CFrame.new(Workspace.CurrentCamera.CFrame.Position, ghostPart.Position)
+            
+            if API then
+               for _, remote in pairs(API:GetChildren()) do
+                  if string.find(string.lower(remote.Name), "shoot") or string.find(string.lower(remote.Name), "blaster") or string.find(string.lower(remote.Name), "ghost") then
+                     if remote:IsA("RemoteEvent") then
+                        remote:FireServer(ghostPart.Position, ghost)
+                     end
+                  end
+               end
+            end
+         end
+      elseif breakableObj then
+         local targetPos = breakableObj:IsA("Model") and breakableObj:GetPivot().Position or breakableObj.Position
+         char.HumanoidRootPart.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 3))
+         
+         if API then
+            for _, remote in pairs(API:GetChildren()) do
+               if string.find(string.lower(remote.Name), "break") or string.find(string.lower(remote.Name), "blaster") then
+                  if remote:IsA("RemoteEvent") then
+                     remote:FireServer(targetPos, breakableObj)
+                  end
+               end
+            end
+         end
+      else
+         teleportTo(CFrame.new(halloweenLocations["Halloween Event"]))
+      end
+   end)
+end
+
+local function processTombFarm()
+   if not autoOpenTombs then return end
+   pcall(function()
+      local char = LocalPlayer.Character
+      if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+      
+      local tombPos = halloweenLocations["Halloween Tomb"]
+      if (char.HumanoidRootPart.Position - tombPos).Magnitude > 50 then
+         teleportTo(CFrame.new(tombPos))
+         task.wait(1)
+      end
+      
+      local coffins = {}
+      for _, obj in pairs(Workspace:GetDescendants()) do
+         if obj:IsA("Model") or obj:IsA("BasePart") then
+            if string.find(string.lower(obj.Name), "coffin") or string.find(string.lower(obj.Name), "grob") or string.find(string.lower(obj.Name), "гроб") then
+               table.insert(coffins, obj)
+            end
+         end
+      end
+      
+      if #coffins > 0 then
+         local chosenCoffin = coffins[math.random(1, #coffins)]
+         local pos = chosenCoffin:IsA("Model") and chosenCoffin:GetPivot().Position or chosenCoffin.Position
+         
+         char.HumanoidRootPart.CFrame = CFrame.new(pos + Vector3.new(0, 2, 2))
+         task.wait(0.5)
+         
+         local API = ReplicatedStorage:FindFirstChild("API")
+         if API then
+            for _, remote in pairs(API:GetChildren()) do
+               if string.find(string.lower(remote.Name), "tomb") or string.find(string.lower(remote.Name), "coffin") or string.find(string.lower(remote.Name), "open") then
+                  if remote:IsA("RemoteEvent") then
+                     remote:FireServer(chosenCoffin)
+                  elseif remote:IsA("RemoteFunction") then
+                     remote:InvokeServer(chosenCoffin)
+                  end
+               end
+            end
+         end
+         
+         fireprompt = fireproximityprompt or function(p) if p then p:InputHoldBegin() task.wait(0.1) p:InputHoldEnd() end end
+         local prompt = chosenCoffin:FindFirstChildWhichIsA("ProximityPrompt", true)
+         if prompt then
+            fireprompt(prompt)
+         end
+      end
+   end)
+end
+
 task.spawn(function()
    while true do
       if autoFarmPet then
          doPetFarm()
       end
-      task.wait(5)
+      if autoGhostFarm then
+         processGhostFarm()
+      end
+      if autoOpenTombs then
+         processTombFarm()
+      end
+      task.wait(0.5)
    end
 end)
 
--- Уведомление
 Rayfield:Notify({
    Title = "xryak Hub",
    Content = "Скрипт готов к работе!",
