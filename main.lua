@@ -116,7 +116,55 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 -- ==========================================
--- ВКЛАДКА: MAIN
+-- ВКЛАДКА 1: HALLOWEEN (ПЕРВАЯ ВКЛАДКА)
+-- ==========================================
+local HalloweenTab = Window:CreateTab("Halloween", 4483362458)
+
+HalloweenTab:CreateSection("Локации Хэллоуинского Ивента")
+
+local halloweenLocations = {
+    ["Новая точка Хэл. Ивента"] = Vector3.new(-262.0, 91.4, -1128.5),
+    ["Хэллоуинский отель"] = Vector3.new(-295.6, 42.5, -1434.3),
+    ["Гробница"] = Vector3.new(-334.4, 41.2, -1199.2),
+    ["Хэллоуинский цирк"] = Vector3.new(-316.9, 36.7, -1705.2)
+}
+
+local selectedHalloweenPreset = "Новая точка Хэл. Ивента"
+
+HalloweenTab:CreateDropdown({
+   Name = "Выберите локацию ивента",
+   Options = {
+       "Новая точка Хэл. Ивента",
+       "Хэллоуинский отель",
+       "Гробница",
+       "Хэллоуинский цирк"
+   },
+   CurrentOption = {"Новая точка Хэл. Ивента"},
+   MultipleOptions = false,
+   Flag = "HalloweenLocationsDropdown",
+   Callback = function(Option)
+      selectedHalloweenPreset = Option[1]
+   end,
+})
+
+HalloweenTab:CreateButton({
+   Name = "Телепортироваться на ивент",
+   Callback = function()
+      local targetPos = halloweenLocations[selectedHalloweenPreset]
+      if targetPos then
+          teleportTo(CFrame.new(targetPos))
+          Rayfield:Notify({
+             Title = "Хэллоуин Телепорт",
+             Content = "Перемещение в: " .. selectedHalloweenPreset,
+             Duration = 3,
+             Image = 4483362458,
+          })
+      end
+   end,
+})
+
+-- ==========================================
+-- ВКЛАДКА 2: MAIN
 -- ==========================================
 local MainTab = Window:CreateTab("Main", 4483362458)
 
@@ -188,61 +236,52 @@ MainTab:CreateKeybind({
 })
 
 -- ==========================================
--- ВКЛАДКА: TELEPORTS
+-- ВКЛАДКА 3: TELEPORTS
 -- ==========================================
 local TeleportTab = Window:CreateTab("Teleports", 4483362458)
 
--- --- СЕКЦИЯ: ИВЕНТЫ И ЛОКАЦИИ ---
-TeleportTab:CreateSection("Хэллоуин и Основные Локации")
+TeleportTab:CreateSection("Основные Локации Города")
 
-local presetLocations = {
-    ["Новая точка Хэл. Ивента"] = Vector3.new(-262.0, 91.4, -1128.5),
-    ["Хэллоуинский отель"] = Vector3.new(-295.6, 42.5, -1434.3),
+local mainLocations = {
     ["Больница"] = Vector3.new(-214.9, 45.4, -1524.2),
     ["Школа"] = Vector3.new(-304.9, 39.3, -1495.3),
-    ["Гробница"] = Vector3.new(-334.4, 41.2, -1199.2),
     ["Пиццерия"] = Vector3.new(-133.7, 39.9, -1662.2),
     ["Кошачье кафе"] = Vector3.new(-27.5, 42.0, -1646.5),
     ["Магазин питомцев"] = Vector3.new(-245.5, 34.2, -1479.1),
-    ["Хэллоуинский цирк"] = Vector3.new(-316.9, 36.7, -1705.2),
     ["Кемпинг"] = Vector3.new(-34.8, 44.0, -1087.6),
     ["Пляж"] = Vector3.new(-594.3, 35.6, -1472.4)
 }
 
-local selectedPreset = "Новая точка Хэл. Ивента"
+local selectedMainPreset = "Больница"
 
 TeleportTab:CreateDropdown({
    Name = "Выберите локацию",
    Options = {
-       "Новая точка Хэл. Ивента",
-       "Хэллоуинский отель",
        "Больница",
        "Школа",
-       "Гробница",
        "Пиццерия",
        "Кошачье кафе",
        "Магазин питомцев",
-       "Хэллоуинский цирк",
        "Кемпинг",
        "Пляж"
    },
-   CurrentOption = {"Новая точка Хэл. Ивента"},
+   CurrentOption = {"Больница"},
    MultipleOptions = false,
-   Flag = "PresetLocationsDropdown",
+   Flag = "MainLocationsDropdown",
    Callback = function(Option)
-      selectedPreset = Option[1]
+      selectedMainPreset = Option[1]
    end,
 })
 
 TeleportTab:CreateButton({
    Name = "Телепортироваться",
    Callback = function()
-      local targetPos = presetLocations[selectedPreset]
+      local targetPos = mainLocations[selectedMainPreset]
       if targetPos then
           teleportTo(CFrame.new(targetPos))
           Rayfield:Notify({
              Title = "Телепорт",
-             Content = "Вы телепортированы в: " .. selectedPreset,
+             Content = "Вы телепортированы в: " .. selectedMainPreset,
              Duration = 3,
              Image = 4483362458,
           })
@@ -370,7 +409,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 -- ==========================================
--- ВКЛАДКА: AUTO FARM (ADOPT ME!)
+-- ВКЛАДКА 4: AUTO FARM (ADOPT ME!)
 -- ==========================================
 local FarmTab = Window:CreateTab("Auto Farm", 4483362458)
 
