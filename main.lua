@@ -19,11 +19,22 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
--- Функция для безопасной телепортации
+-- Функция безопасной телепортации
 local function teleportTo(cframe)
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         LocalPlayer.Character.HumanoidRootPart.CFrame = cframe
     end
+end
+
+-- Функция правильной загрузки основного мира Adopt Me!
+local function loadMainMap()
+    pcall(function()
+        local Fsys = require(ReplicatedStorage:WaitForChild("Fsys"))
+        local RouterClient = Fsys.load("RouterClient")
+        
+        -- Вызываем официальный переход игры на MainMap
+        RouterClient.get("LocationAPI/SetLocation"):FireServer("MainMap", "Shop", "MainDoor")
+    end)
 end
 
 -- ==========================================
@@ -66,11 +77,37 @@ MainTab:CreateSlider({
 -- ==========================================
 local TeleportTab = Window:CreateTab("Teleports", 4483362458)
 
-TeleportTab:CreateSection("Быстрый телепорт по локациям")
+TeleportTab:CreateSection("Переход в Главный Город")
 
+TeleportTab:CreateButton({
+   Name = "Загрузить Главный Город (Main Map)",
+   Callback = function()
+      loadMainMap()
+      Rayfield:Notify({
+         Title = "Телепорт",
+         Content = "Загружаем основной мир...",
+         Duration = 3,
+         Image = 4483362458,
+      })
+   end,
+})
+
+TeleportTab:CreateButton({
+   Name = "Подняться на карту (Выбраться из пустоты)",
+   Callback = function()
+      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+         local currentCFrame = LocalPlayer.Character.HumanoidRootPart.CFrame
+         LocalPlayer.Character.HumanoidRootPart.CFrame = currentCFrame + Vector3.new(0, 500, 0)
+      end
+   end,
+})
+
+TeleportTab:CreateSection("Точные координаты (Основная карта)")
+
+-- Координаты с учетом реальной высоты карты в Adopt Me
 local locations = {
-    ["Центр (Nursery / Main Center)"] = Vector3.new(-175, 35, -1510),
-    ["Больница (Hospital)"] = Vector3.new(-285, 30, -1770),
+    ["Центр / Nursery"] = Vector3.new(-242, 30, -1742),
+    ["Больница (Hospital)"] = Vector3.new(-290, 30, -1770),
     ["Школа (School)"] = Vector3.new(-330, 30, -1450),
     ["Зоомагазин (Pet Shop)"] = Vector3.new(-110, 30, -1650),
     ["Игровая площадка (Playground)"] = Vector3.new(-215, 30, -1660),
@@ -78,12 +115,12 @@ local locations = {
     ["Пиццерия (Pizza Shop)"] = Vector3.new(-120, 30, -1350)
 }
 
-local selectedLocation = "Центр (Nursery / Main Center)"
+local selectedLocation = "Центр / Nursery"
 
 TeleportTab:CreateDropdown({
    Name = "Выберите локацию",
-   Options = {"Центр (Nursery / Main Center)", "Больница (Hospital)", "Школа (School)", "Зоомагазин (Pet Shop)", "Игровая площадка (Playground)", "Пляж (Beach)", "Пиццерия (Pizza Shop)"},
-   CurrentOption = {"Центр (Nursery / Main Center)"},
+   Options = {"Центр / Nursery", "Больница (Hospital)", "Школа (School)", "Зоомагазин (Pet Shop)", "Игровая площадка (Playground)", "Пляж (Beach)", "Пиццерия (Pizza Shop)"},
+   CurrentOption = {"Центр / Nursery"},
    MultipleOptions = false,
    Flag = "TeleportDropdown",
    Callback = function(Option)
@@ -99,7 +136,7 @@ TeleportTab:CreateButton({
           teleportTo(CFrame.new(targetPos))
           Rayfield:Notify({
              Title = "Телепорт",
-             Content = "Вы успешно телепортированы в: " .. selectedLocation,
+             Content = "Перемещение в: " .. selectedLocation,
              Duration = 3,
              Image = 4483362458,
           })
@@ -114,8 +151,8 @@ TeleportTab:CreateButton({
    Callback = function()
       Rayfield:Notify({
          Title = "Click TP",
-         Content = "Зажмите Ctrl и нажмите ЛКМ в любую точку на карте, чтобы телепортироваться.",
-         Duration = 5,
+         Content = "Зажмите Ctrl и нажмите ЛКМ по поверхности.",
+         Duration = 4,
          Image = 4483362458,
       })
    end,
@@ -147,7 +184,7 @@ FarmTab:CreateToggle({
       if autoFarmPet then
          Rayfield:Notify({
             Title = "xryak Auto Farm",
-            Content = "Автофарм запущен! Ожидайте появления задач...",
+            Content = "Автофарм запущен!",
             Duration = 3,
             Image = 4483362458,
          })
@@ -168,13 +205,8 @@ local function doPetFarm()
       local API = ReplicatedStorage:FindFirstChild("API")
       if not API then return end
 
-      -- Список стандартных сервисов Adopt Me
-      local LocationAPI = API:FindFirstChild("HousingAPI/BuyItem") or API:FindFirstChild("DailyQuestsAPI/ClaimQuest")
-      
-      -- Ищем активные ремоуты ухода за питомцем
       for _, remote in pairs(API:GetChildren()) do
          if remote:IsA("RemoteFunction") or remote:IsA("RemoteEvent") then
-            -- Пробуем отправить сигналы на закрытие потребностей
             if string.find(string.lower(remote.Name), "pet") or string.find(string.lower(remote.Name), "task") then
                if remote:IsA("RemoteFunction") then
                   remote:InvokeServer("sleepy")
