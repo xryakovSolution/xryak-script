@@ -486,7 +486,7 @@ local function processGhostFarm()
       local breakableObj = nil
       
       for _, obj in pairs(Workspace:GetDescendants()) do
-         if obj:IsA("Model") and (string.find(string.lower(obj.Name), "ghost") or string.find(string.lower(obj.Name), " призрак")) then
+         if obj:IsA("Model") and (string.find(string.lower(obj.Name), "ghost") or string.find(string.lower(obj.Name), "призрак")) then
             ghost = obj
             break
          end
@@ -547,10 +547,20 @@ local function processTombFarm()
       if not char or not char:FindFirstChild("HumanoidRootPart") then return end
       
       local tombPos = halloweenLocations["Halloween Tomb"]
-      if (char.HumanoidRootPart.Position - tombPos).Magnitude > 50 then
+      if (char.HumanoidRootPart.Position - tombPos).Magnitude > 60 then
          teleportTo(CFrame.new(tombPos))
-         task.wait(1)
+         task.wait(0.8)
       end
+      
+      local portalOffset = CFrame.new(0, 0, -8)
+      local portalDoor = Workspace:FindFirstChild("TombDoor", true) or Workspace:FindFirstChild("Portal", true)
+      if portalDoor then
+         char.HumanoidRootPart.CFrame = portalDoor.CFrame * CFrame.new(0, 0, -5)
+      else
+         char.HumanoidRootPart.CFrame = CFrame.new(tombPos) * CFrame.Angles(0, math.rad(180), 0) * portalOffset
+      end
+      
+      task.wait(1)
       
       local coffins = {}
       for _, obj in pairs(Workspace:GetDescendants()) do
@@ -565,13 +575,13 @@ local function processTombFarm()
          local chosenCoffin = coffins[math.random(1, #coffins)]
          local pos = chosenCoffin:IsA("Model") and chosenCoffin:GetPivot().Position or chosenCoffin.Position
          
-         char.HumanoidRootPart.CFrame = CFrame.new(pos + Vector3.new(0, 2, 2))
-         task.wait(0.5)
+         char.HumanoidRootPart.CFrame = CFrame.new(pos + Vector3.new(0, 2, 3))
+         task.wait(0.4)
          
          local API = ReplicatedStorage:FindFirstChild("API")
          if API then
             for _, remote in pairs(API:GetChildren()) do
-               if string.find(string.lower(remote.Name), "tomb") or string.find(string.lower(remote.Name), "coffin") or string.find(string.lower(remote.Name), "open") then
+               if string.find(string.lower(remote.Name), "tomb") or string.find(string.lower(remote.Name), "coffin") or string.find(string.lower(remote.Name), "open") or string.find(string.lower(remote.Name), "key") then
                   if remote:IsA("RemoteEvent") then
                      remote:FireServer(chosenCoffin)
                   elseif remote:IsA("RemoteFunction") then
