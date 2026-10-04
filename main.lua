@@ -31,7 +31,31 @@ local flyConnection = nil
 local customWaypoints = {}
 local waypointDropdown = nil
 
+-- Проверка и телепорт из района с домами в главный город
+local function ensureMainMap()
+    pcall(function()
+        local isHousing = Workspace:FindFirstChild("House") or Workspace:FindFirstChild("Housing") or Workspace:FindFirstChild("Pets") == nil
+        
+        if isHousing then
+            local API = ReplicatedStorage:FindFirstChild("API")
+            if API then
+                for _, remote in pairs(API:GetChildren()) do
+                    if string.find(string.lower(remote.Name), "location") or string.find(string.lower(remote.Name), "door") or string.find(string.lower(remote.Name), "teleport") then
+                        if remote:IsA("RemoteFunction") then
+                            remote:InvokeServer("MainDoor", {["destination"] = "MainMap"})
+                        elseif remote:IsA("RemoteEvent") then
+                            remote:FireServer("MainDoor", {["destination"] = "MainMap"})
+                        end
+                    end
+                end
+            end
+            task.wait(2)
+        end
+    end)
+end
+
 local function teleportTo(cframe)
+    ensureMainMap()
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         LocalPlayer.Character.HumanoidRootPart.CFrame = cframe
     end
@@ -476,6 +500,7 @@ end
 
 local function processGhostFarm()
    if not autoGhostFarm then return end
+   ensureMainMap()
    pcall(function()
       equipBlaster()
       
@@ -542,46 +567,55 @@ end
 
 local function processTombFarm()
    if not autoOpenTombs then return end
+   ensureMainMap()
    pcall(function()
       local char = LocalPlayer.Character
       if not char or not char:FindFirstChild("HumanoidRootPart") then return end
       
-      local tombPos = halloweenLocations["Halloween Tomb"]
-      if (char.HumanoidRootPart.Position - tombPos).Magnitude > 60 then
-         teleportTo(CFrame.new(tombPos))
-         task.wait(0.8)
+      local tombEntrance = nil
+      for _, obj in pairs(Workspace:GetDescendants()) do
+         if obj:IsA("BasePart") or obj:IsA("Model") then
+            local name = string.lower(obj.Name)
+            if string.find(name, "tombdoor") or string.find(name, "tomb_portal") or string.find(name, "tombentrance") then
+               tombEntrance = obj
+               break
+            end
+         end
       end
-      
-      local portalOffset = CFrame.new(0, 0, -8)
-      local portalDoor = Workspace:FindFirstChild("TombDoor", true) or Workspace:FindFirstChild("Portal", true)
-      if portalDoor then
-         char.HumanoidRootPart.CFrame = portalDoor.CFrame * CFrame.new(0, 0, -5)
+
+      local baseCFrame
+      if tombEntrance then
+         baseCFrame = tombEntrance:IsA("Model") and tombEntrance:GetPivot() or tombEntrance.CFrame
       else
-         char.HumanoidRootPart.CFrame = CFrame.new(tombPos) * CFrame.Angles(0, math.rad(180), 0) * portalOffset
+         local fallbackPos = halloweenLocations["Halloween Tomb"]
+         baseCFrame = CFrame.new(fallbackPos)
       end
-      
+
+      char.HumanoidRootPart.CFrame = baseCFrame * CFrame.new(0, 0, -8)
       task.wait(1)
-      
+
       local coffins = {}
       for _, obj in pairs(Workspace:GetDescendants()) do
          if obj:IsA("Model") or obj:IsA("BasePart") then
-            if string.find(string.lower(obj.Name), "coffin") or string.find(string.lower(obj.Name), "grob") or string.find(string.lower(obj.Name), "гроб") then
+            local name = string.lower(obj.Name)
+            if string.find(name, "coffin") or string.find(name, "grob") or string.find(name, "гроб") then
                table.insert(coffins, obj)
             end
          end
       end
-      
+
       if #coffins > 0 then
          local chosenCoffin = coffins[math.random(1, #coffins)]
-         local pos = chosenCoffin:IsA("Model") and chosenCoffin:GetPivot().Position or chosenCoffin.Position
+         local coffinCFrame = chosenCoffin:IsA("Model") and chosenCoffin:GetPivot() or chosenCoffin.CFrame
          
-         char.HumanoidRootPart.CFrame = CFrame.new(pos + Vector3.new(0, 2, 3))
+         char.HumanoidRootPart.CFrame = coffinCFrame * CFrame.new(0, 2, 3)
          task.wait(0.4)
-         
+
          local API = ReplicatedStorage:FindFirstChild("API")
          if API then
             for _, remote in pairs(API:GetChildren()) do
-               if string.find(string.lower(remote.Name), "tomb") or string.find(string.lower(remote.Name), "coffin") or string.find(string.lower(remote.Name), "open") or string.find(string.lower(remote.Name), "key") then
+               local rName = string.lower(remote.Name)
+               if string.find(rName, "tomb") or string.find(rName, "coffin") or string.find(rName, "open") or string.find(rName, "key") then
                   if remote:IsA("RemoteEvent") then
                      remote:FireServer(chosenCoffin)
                   elseif remote:IsA("RemoteFunction") then
@@ -590,8 +624,8 @@ local function processTombFarm()
                end
             end
          end
-         
-         fireprompt = fireproximityprompt or function(p) if p then p:InputHoldBegin() task.wait(0.1) p:InputHoldEnd() end end
+
+         local fireprompt = fireproximityprompt or function(p) if p then p:InputHoldBegin() task.wait(0.1) p:InputHoldEnd() end end
          local prompt = chosenCoffin:FindFirstChildWhichIsA("ProximityPrompt", true)
          if prompt then
             fireprompt(prompt)
