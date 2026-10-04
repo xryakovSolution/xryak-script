@@ -1,7 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "xryak Hub | Ghost Gallery Farm",
+   Name = "xryak Hub | Adopt Me!",
    LoadingTitle = "Загрузка xryak...",
    LoadingSubtitle = "by xryakovSolution",
    ConfigurationSaving = { Enabled = false },
@@ -14,10 +14,54 @@ local Workspace = game:GetService("Workspace")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
+-- Переменные состояний
 local autoGhostFarm = false
 local autoAcceptTeleport = true
+local autoOpenTombs = false
 
--- 1. Авто-кликер для всплывающего окна "Ghost Gallery is starting soon! Teleport there now?"
+-- Вспомогательная функция для выхода на главную карту
+local function ensureMainMap()
+    pcall(function()
+        local isHousing = Workspace:FindFirstChild("House") or Workspace:FindFirstChild("Housing")
+        if isHousing then
+            local API = ReplicatedStorage:FindFirstChild("API")
+            if API then
+                for _, remote in pairs(API:GetChildren()) do
+                    if string.find(string.lower(remote.Name), "location") or string.find(string.lower(remote.Name), "door") then
+                        if remote:IsA("RemoteFunction") then
+                            remote:InvokeServer("MainDoor", {["destination"] = "MainMap"})
+                        elseif remote:IsA("RemoteEvent") then
+                            remote:FireServer("MainDoor", {["destination"] = "MainMap"})
+                        end
+                    end
+                end
+            end
+            task.wait(2)
+        end
+    end)
+end
+
+-- Авто-экипировка Бластера
+local function equipBlaster()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    local bp = LocalPlayer:FindFirstChild("Backpack")
+    
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then return tool end
+    
+    if bp then
+        for _, item in pairs(bp:GetChildren()) do
+            if item:IsA("Tool") then
+                char.Humanoid:EquipTool(item)
+                return item
+            end
+        end
+    end
+    return nil
+end
+
+-- Клик на "Yes" в всплывающем окне ивента
 local function checkAndAcceptTeleport()
     if not autoAcceptTeleport then return end
     pcall(function()
@@ -28,14 +72,8 @@ local function checkAndAcceptTeleport()
             if gui:IsA("ScreenGui") and gui.Enabled then
                 for _, btn in pairs(gui:GetDescendants()) do
                     if btn:IsA("TextButton") or btn:IsA("ImageButton") then
-                        local text = ""
-                        if btn:IsA("TextButton") then
-                            text = string.lower(btn.Text)
-                        end
-                        -- Проверяем кнопку Yes или зеленую кнопку принятия телепорта
+                        local text = btn:IsA("TextButton") and string.lower(btn.Text) or ""
                         if text == "yes" or btn.Name == "Yes" or btn.Name == "ConfirmButton" then
-                            local parentText = string.lower(btn.Parent and btn.Parent.ClassName or "")
-                            -- Нажимаем кнопку кликом
                             for _, sample in pairs(gui:GetDescendants()) do
                                 if sample:IsA("TextLabel") and string.find(string.lower(sample.Text), "ghost gallery") then
                                     if firesignal then
@@ -57,33 +95,12 @@ local function checkAndAcceptTeleport()
     end)
 end
 
--- 2. Поиск и экипировка Бластера
-local function equipBlaster()
-    local char = LocalPlayer.Character
-    if not char then return nil end
-    local bp = LocalPlayer:FindFirstChild("Backpack")
-    
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool then return tool end
-    
-    if bp then
-        for _, item in pairs(bp:GetChildren()) do
-            if item:IsA("Tool") then
-                char.Humanoid:EquipTool(item)
-                return item
-            end
-        end
-    end
-    return nil
-end
-
--- 3. Вход в круг ожидания (NEXT GAME IN: 00:10)
+-- Вход в круг ожидания
 local function stepInWaitingCircle()
     pcall(function()
         local char = LocalPlayer.Character
         if not char or not char:FindFirstChild("HumanoidRootPart") then return end
         
-        -- Ищем светящееся кольцо/зону ожидания
         for _, obj in pairs(Workspace:GetDescendants()) do
             if obj:IsA("BasePart") then
                 local name = string.lower(obj.Name)
@@ -98,7 +115,7 @@ local function stepInWaitingCircle()
     end)
 end
 
--- 4. Главный логический модуль Охоты на Призраков
+-- Модуль Автофарма ивента
 local function processGhostEvent()
     if not autoGhostFarm then return end
     
@@ -111,7 +128,6 @@ local function processGhostEvent()
         local hrp = char.HumanoidRootPart
         local camera = Workspace.CurrentCamera
         
-        -- Проверяем, находимся ли мы уже внутри самой мини-игры (по наличию кнопки Exit Minigame / интерфейса Score)
         local inMinigame = false
         local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
         if playerGui then
@@ -127,11 +143,10 @@ local function processGhostEvent()
             end
         end
 
-        -- Если идет мини-игра
         if inMinigame then
             equipBlaster()
 
-            -- А. Ищем Призрака
+            -- 1. Поиск Призрака
             local targetGhost = nil
             for _, obj in pairs(Workspace:GetDescendants()) do
                 if obj:IsA("Model") and (string.find(string.lower(obj.Name), "ghost") or string.find(string.lower(obj.Name), "призрак")) then
@@ -144,28 +159,13 @@ local function processGhostEvent()
             end
 
             if targetGhost then
-                -- Телепортируемся лицом к призраку
                 hrp.CFrame = CFrame.new(targetGhost.Position + Vector3.new(0, 1, 6), targetGhost.Position)
                 camera.CFrame = CFrame.new(camera.CFrame.Position, targetGhost.Position)
-                
-                -- Зажимаем атакующую клавишу/мышь
                 VirtualInputManager:SendMouseButtonEvent(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2, 0, true, game, 0)
-                
-                -- Отправка прямого вызова на сервер
-                local API = ReplicatedStorage:FindFirstChild("API")
-                if API then
-                    for _, remote in pairs(API:GetChildren()) do
-                        if string.find(string.lower(remote.Name), "shoot") or string.find(string.lower(remote.Name), "blaster") or string.find(string.lower(remote.Name), "hit") then
-                            if remote:IsA("RemoteEvent") then
-                                remote:FireServer(targetGhost.Position, targetGhost.Parent)
-                            end
-                        end
-                    end
-                end
                 return
             end
 
-            -- Б. Если призрака нет — ищем Мебель/Предмет
+            -- 2. Поиск Мебели
             local targetProp = nil
             for _, obj in pairs(Workspace:GetDescendants()) do
                 if obj:IsA("Model") or obj:IsA("BasePart") then
@@ -184,17 +184,30 @@ local function processGhostEvent()
                 VirtualInputManager:SendMouseButtonEvent(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2, 0, true, game, 0)
             end
         else
-            -- Если мы еще в лобби ожидания — встаем в круг
             VirtualInputManager:SendMouseButtonEvent(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2, 0, false, game, 0)
             stepInWaitingCircle()
         end
     end)
 end
 
--- Интерфейс Rayfield
-local Tab = Window:CreateTab("Ghost Gallery", 4483362458)
+-- ====================================================================
+--  ВКЛАДКИ ИНТЕРФЕЙСА RAYFIELD
+-- ====================================================================
 
-Tab:CreateToggle({
+-- 1. Основное меню
+local MainTab = Window:CreateTab("Главное", 4483362458)
+MainTab:CreateLabel("Добро пожаловать в xryak Hub!")
+MainTab:CreateButton({
+   Name = "Выйти из дома на главную карту",
+   Callback = function()
+      ensureMainMap()
+   end,
+})
+
+-- 2. Ивентовая вкладка (Ghost Gallery)
+local EventTab = Window:CreateTab("Halloween Event", 4483362458)
+
+EventTab:CreateToggle({
    Name = "Авто-принятие Телепорта (Кнопка YES)",
    CurrentValue = true,
    Flag = "AutoAcceptToggle",
@@ -203,8 +216,8 @@ Tab:CreateToggle({
    end,
 })
 
-Tab:CreateToggle({
-   Name = "Авто-Фарм Ивента (Полный цикл)",
+EventTab:CreateToggle({
+   Name = "Авто-Фарм Ghost Gallery (Призраки + Мебель)",
    CurrentValue = false,
    Flag = "AutoGhostFarmToggle",
    Callback = function(Value)
@@ -215,7 +228,58 @@ Tab:CreateToggle({
    end,
 })
 
--- Запуск фонового цикла
+-- 3. Вкладка Телепортов (Включая Трейдинг Хаб)
+local TeleportTab = Window:CreateTab("Телепорты", 4483362458)
+
+local mainLocations = {
+    ["Больница"] = Vector3.new(292.0, 31.0, -1451.0),
+    ["Школа"] = Vector3.new(-180.0, 31.0, -1400.0),
+    ["Пиццерия"] = Vector3.new(-120.0, 31.0, -1180.0),
+    ["Кошачье кафе"] = Vector3.new(150.0, 31.0, -1100.0),
+    ["Магазин питомцев"] = Vector3.new(-200.0, 31.0, -1600.0),
+    ["Кемпинг"] = Vector3.new(-900.0, 31.0, -1100.0),
+    ["Пляж"] = Vector3.new(-550.0, 31.0, -1700.0),
+    ["Трейдинг Хаб"] = Vector3.new(245.0, 35.0, -1650.0)
+}
+
+TeleportTab:CreateDropdown({
+   Name = "Телепорт по локациям",
+   Options = {"Больница", "Школа", "Пиццерия", "Кошачье кафе", "Магазин питомцев", "Кемпинг", "Пляж", "Трейдинг Хаб"},
+   CurrentOption = {"Больница"},
+   MultipleOptions = false,
+   Flag = "LocationDropdown",
+   Callback = function(Option)
+      ensureMainMap()
+      local selected = type(Option) == "table" and Option[1] or Option
+      local pos = mainLocations[selected]
+      if pos and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+         LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(pos)
+      end
+   end,
+})
+
+TeleportTab:CreateButton({
+   Name = "Прямой переход в Трейдинг Хаб (Remote)",
+   Callback = function()
+      ensureMainMap()
+      pcall(function()
+         local API = ReplicatedStorage:FindFirstChild("API")
+         if API then
+            for _, remote in pairs(API:GetChildren()) do
+               if string.find(string.lower(remote.Name), "location") or string.find(string.lower(remote.Name), "door") then
+                  if remote:IsA("RemoteFunction") then
+                     remote:InvokeServer("TradingHubDoor", {["destination"] = "TradingHub"})
+                  elseif remote:IsA("RemoteEvent") then
+                     remote:FireServer("TradingHubDoor", {["destination"] = "TradingHub"})
+                  end
+               end
+            end
+         end
+      end)
+   end,
+})
+
+-- Фоновый поток автофарма
 task.spawn(function()
     while true do
         if autoGhostFarm then
