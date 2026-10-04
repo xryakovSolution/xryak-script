@@ -12,14 +12,31 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
--- Переменные состояний
+-- ====================================================================
+--  ПЕРЕМЕННЫЕ СОСТОЯНИЙ (Player, Event & AutoFarm)
+-- ====================================================================
+local walkSpeed = 16
+local jumpPower = 50
+local isFlyEnabled = false
+local flySpeed = 50
+local isNoclipEnabled = false
+local isInfJumpEnabled = false
+
 local autoGhostFarm = false
 local autoAcceptTeleport = true
-local autoOpenTombs = false
 
--- Вспомогательная функция для выхода на главную карту
+local selectedPlayer = nil
+local selectedPet = nil
+
+-- ====================================================================
+--  ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+-- ====================================================================
+
+-- Безопасный выход из дома на главную карту
 local function ensureMainMap()
     pcall(function()
         local isHousing = Workspace:FindFirstChild("House") or Workspace:FindFirstChild("Housing")
@@ -61,7 +78,7 @@ local function equipBlaster()
     return nil
 end
 
--- Клик на "Yes" в всплывающем окне ивента
+-- Авто-нажатие кнопки YES на приглашение ивента
 local function checkAndAcceptTeleport()
     if not autoAcceptTeleport then return end
     pcall(function()
@@ -95,7 +112,7 @@ local function checkAndAcceptTeleport()
     end)
 end
 
--- Вход в круг ожидания
+-- Вход в круг ожидания (NEXT GAME IN: 00:10)
 local function stepInWaitingCircle()
     pcall(function()
         local char = LocalPlayer.Character
@@ -115,7 +132,7 @@ local function stepInWaitingCircle()
     end)
 end
 
--- Модуль Автофарма ивента
+-- Логика фарма ивента
 local function processGhostEvent()
     if not autoGhostFarm then return end
     
@@ -191,12 +208,84 @@ local function processGhostEvent()
 end
 
 -- ====================================================================
+--  ФИЗИКА И МОДИФИКАЦИИ ИГРОКА (Fly, Noclip, Speed, InfJump)
+-- ====================================================================
+
+-- Обработчик Скорости и Прыжка
+RunService.Stepped:Connect(function()
+    pcall(function()
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.WalkSpeed = walkSpeed
+            char.Humanoid.JumpPower = jumpPower
+            
+            if isNoclipEnabled then
+                for _, part in pairs(char:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end
+    end)
+end)
+
+-- Бесконечный прыжок
+UserInputService.JumpRequest:Connect(function()
+    if isInfJumpEnabled then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+-- Логика Полета (Fly)
+local flyBodyVel, flyBodyGyro
+RunService.RenderStepped:Connect(function()
+    if isFlyEnabled then
+        pcall(function()
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local hrp = char.HumanoidRootPart
+                local cam = Workspace.CurrentCamera
+                
+                if not flyBodyVel then
+                    flyBodyVel = Instance.new("BodyVelocity", hrp)
+                    flyBodyVel.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+                end
+                if not flyBodyGyro then
+                    flyBodyGyro = Instance.new("BodyGyro", hrp)
+                    flyBodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+                    flyBodyGyro.P = 9e4
+                end
+
+                flyBodyGyro.CFrame = cam.CFrame
+                
+                local moveDir = Vector3.new()
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+
+                flyBodyVel.Velocity = moveDir * flySpeed
+            end
+        end)
+    else
+        if flyBodyVel then flyBodyVel:Destroy() flyBodyVel = nil end
+        if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
+    end
+end)
+
+-- ====================================================================
 --  ВКЛАДКИ ИНТЕРФЕЙСА RAYFIELD
 -- ====================================================================
 
--- 1. Основное меню
+-- 1. Главная
 local MainTab = Window:CreateTab("Главное", 4483362458)
-MainTab:CreateLabel("Добро пожаловать в xryak Hub!")
+MainTab:CreateLabel("xryak Hub | Скрипт активен")
 MainTab:CreateButton({
    Name = "Выйти из дома на главную карту",
    Callback = function()
@@ -204,7 +293,73 @@ MainTab:CreateButton({
    end,
 })
 
--- 2. Ивентовая вкладка (Ghost Gallery)
+-- 2. Вкладка Игрока (Скорость, Прыжок, Полет, Ноуклип)
+local PlayerTab = Window:CreateTab("Персонаж", 4483362458)
+
+PlayerTab:CreateSlider({
+   Name = "Скорость бега (WalkSpeed)",
+   Range = {16, 200},
+   Increment = 1,
+   Suffix = "Speed",
+   CurrentValue = 16,
+   Flag = "SpeedSlider",
+   Callback = function(Value)
+      walkSpeed = Value
+   end,
+})
+
+PlayerTab:CreateSlider({
+   Name = "Высота прыжка (JumpPower)",
+   Range = {50, 300},
+   Increment = 1,
+   Suffix = "Power",
+   CurrentValue = 50,
+   Flag = "JumpSlider",
+   Callback = function(Value)
+      jumpPower = Value
+   end,
+})
+
+PlayerTab:CreateToggle({
+   Name = "Режим полета (Fly)",
+   CurrentValue = false,
+   Flag = "FlyToggle",
+   Callback = function(Value)
+      isFlyEnabled = Value
+   end,
+})
+
+PlayerTab:CreateSlider({
+   Name = "Скорость полета",
+   Range = {20, 200},
+   Increment = 5,
+   Suffix = "Speed",
+   CurrentValue = 50,
+   Flag = "FlySpeedSlider",
+   Callback = function(Value)
+      flySpeed = Value
+   end,
+})
+
+PlayerTab:CreateToggle({
+   Name = "Проход сквозь стены (Noclip)",
+   CurrentValue = false,
+   Flag = "NoclipToggle",
+   Callback = function(Value)
+      isNoclipEnabled = Value
+   end,
+})
+
+PlayerTab:CreateToggle({
+   Name = "Бесконечный прыжок (Inf Jump)",
+   CurrentValue = false,
+   Flag = "InfJumpToggle",
+   Callback = function(Value)
+      isInfJumpEnabled = Value
+   end,
+})
+
+-- 3. Вкладка Ивента (Ghost Gallery)
 local EventTab = Window:CreateTab("Halloween Event", 4483362458)
 
 EventTab:CreateToggle({
@@ -228,7 +383,7 @@ EventTab:CreateToggle({
    end,
 })
 
--- 3. Вкладка Телепортов (Включая Трейдинг Хаб)
+-- 4. Вкладка Телепортов (Локации, Игроки, Питомцы)
 local TeleportTab = Window:CreateTab("Телепорты", 4483362458)
 
 local mainLocations = {
@@ -276,6 +431,47 @@ TeleportTab:CreateButton({
             end
          end
       end)
+   end,
+})
+
+-- Телепорт к игроку
+local function getPlayerList()
+    local plrs = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(plrs, p.Name)
+        end
+    end
+    return #plrs > 0 and plrs or {"Нет игроков"}
+end
+
+local playerDropdown = TeleportTab:CreateDropdown({
+   Name = "Выберите игрока",
+   Options = getPlayerList(),
+   CurrentOption = {""},
+   MultipleOptions = false,
+   Flag = "PlayerDropdown",
+   Callback = function(Option)
+      selectedPlayer = type(Option) == "table" and Option[1] or Option
+   end,
+})
+
+TeleportTab:CreateButton({
+   Name = "Телепортироваться к игроку",
+   Callback = function()
+      if selectedPlayer and Players:FindFirstChild(selectedPlayer) then
+         local target = Players[selectedPlayer].Character
+         if target and target:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = target.HumanoidRootPart.CFrame + Vector3.new(0, 2, 0)
+         end
+      end
+   end,
+})
+
+TeleportTab:CreateButton({
+   Name = "Обновить список игроков",
+   Callback = function()
+      playerDropdown:Refresh(getPlayerList())
    end,
 })
 
