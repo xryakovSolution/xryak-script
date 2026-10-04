@@ -28,7 +28,7 @@ local bodyVelocity = nil
 local bodyGyro = nil
 local flyConnection = nil
 
--- Таблица для сохраненных точек телепорта
+-- Таблица для сохраненных кастомных точек телепорта
 local customWaypoints = {}
 local waypointDropdown = nil
 
@@ -188,10 +188,67 @@ MainTab:CreateKeybind({
 })
 
 -- ==========================================
--- ВКЛАДКА: TELEPORTS (СВОИ ТОЧКИ)
+-- ВКЛАДКА: TELEPORTS
 -- ==========================================
 local TeleportTab = Window:CreateTab("Teleports", 4483362458)
 
+-- --- СЕКЦИЯ: ИВЕНТЫ И ЛОКАЦИИ ---
+TeleportTab:CreateSection("Хэллоуин и Локации")
+
+local presetLocations = {
+    ["НОВЫЙ Хэллоуинский ивент"] = Vector3.new(-5979.3, 10010.8, 9001.4),
+    ["Хэллоуинский цирк"] = Vector3.new(-316.9, 36.7, -1705.2),
+    ["Хэллоуинский отель"] = Vector3.new(-10.2, 6949.8, 8936.4),
+    ["Хэллоуинская гробница"] = Vector3.new(-11982.1, 7016.5, -9003.3),
+    ["Школа"] = Vector3.new(-3005.2, 9987.5, 3010.4),
+    ["Больница"] = Vector3.new(-2980.3, 4012.8, 5710.7),
+    ["Магазин питомцев"] = Vector3.new(12008.9, 7073.0, 8949.3),
+    ["Кемпинг"] = Vector3.new(-34.8, 44.0, -1087.6),
+    ["Пиццерия"] = Vector3.new(-2998.9, 7023.4, -5978.8),
+    ["Пляж"] = Vector3.new(-594.3, 35.6, -1472.4)
+}
+
+local selectedPreset = "НОВЫЙ Хэллоуинский ивент"
+
+TeleportTab:CreateDropdown({
+   Name = "Выберите локацию",
+   Options = {
+       "НОВЫЙ Хэллоуинский ивент",
+       "Хэллоуинский цирк",
+       "Хэллоуинский отель",
+       "Хэллоуинская гробница",
+       "Школа",
+       "Больница",
+       "Магазин питомцев",
+       "Кемпинг",
+       "Пиццерия",
+       "Пляж"
+   },
+   CurrentOption = {"НОВЫЙ Хэллоуинский ивент"},
+   MultipleOptions = false,
+   Flag = "PresetLocationsDropdown",
+   Callback = function(Option)
+      selectedPreset = Option[1]
+   end,
+})
+
+TeleportTab:CreateButton({
+   Name = "Телепортироваться",
+   Callback = function()
+      local targetPos = presetLocations[selectedPreset]
+      if targetPos then
+          teleportTo(CFrame.new(targetPos))
+          Rayfield:Notify({
+             Title = "Телепорт",
+             Content = "Вы телепортированы в: " .. selectedPreset,
+             Duration = 3,
+             Image = 4483362458,
+          })
+      end
+   end,
+})
+
+-- --- СЕКЦИЯ: СОБСТВЕННЫЕ ТОЧКИ ---
 TeleportTab:CreateSection("Сохранение собственных точек")
 
 local newWaypointName = "Точка 1"
@@ -217,7 +274,6 @@ TeleportTab:CreateButton({
           
           customWaypoints[newWaypointName] = LocalPlayer.Character.HumanoidRootPart.CFrame
           
-          -- Обновляем список выбора
           local keys = {}
           for k in pairs(customWaypoints) do
               table.insert(keys, k)
