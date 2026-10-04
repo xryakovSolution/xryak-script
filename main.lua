@@ -1,3 +1,19 @@
+-- Загрузка библиотеки UI (Rayfield)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Создание главного окна xryak
+local Window = Rayfield:CreateWindow({
+   Name = "xryak Hub | Adopt Me!",
+   LoadingTitle = "Загрузка xryak...",
+   LoadingSubtitle = "by xryakovSolution",
+   ConfigurationSaving = {
+      Enabled = false,
+   },
+   KeySystem = false
+})
+
+-- Переменные
+local autoFarmPet = false
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -12,7 +28,7 @@ local bodyVelocity = nil
 local bodyGyro = nil
 local flyConnection = nil
 
--- Таблица для сохраненных точек телепорта
+-- Таблица для сохраненных кастомных точек телепорта
 local customWaypoints = {}
 local waypointDropdown = nil
 
@@ -23,11 +39,6 @@ local function teleportTo(cframe)
     end
 end
 
--- Функция правильной загрузки основного мира Adopt Me!
-local function loadMainMap()
-    pcall(function()
-        local Fsys = require(ReplicatedStorage:WaitForChild("Fsys"))
-        local RouterClient = Fsys.load("RouterClient")
 -- Логика управления Fly
 local function startFly()
     local char = LocalPlayer.Character
@@ -56,9 +67,7 @@ local function startFly()
         
         local camera = workspace.CurrentCamera
         local moveDir = Vector3.new(0, 0, 0)
-
-        -- Вызываем официальный переход игры на MainMap
-        RouterClient.get("LocationAPI/SetLocation"):FireServer("MainMap", "Shop", "MainDoor")
+        
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then
             moveDir = moveDir + camera.CFrame.LookVector
         end
@@ -107,9 +116,85 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 -- ==========================================
--- ВКЛАДКА: MAIN
+-- ВКЛАДКА 1: HALLOWEEN (ПЕРВАЯ ВКЛАДКА)
 -- ==========================================
-@@ -72,71 +150,137 @@ MainTab:CreateSlider({
+local HalloweenTab = Window:CreateTab("Halloween", 4483362458)
+
+HalloweenTab:CreateSection("Локации Хэллоуинского Ивента")
+
+local halloweenLocations = {
+    ["Новая точка Хэл. Ивента"] = Vector3.new(-262.0, 91.4, -1128.5),
+    ["Хэллоуинский отель"] = Vector3.new(-295.6, 42.5, -1434.3),
+    ["Гробница"] = Vector3.new(-334.4, 41.2, -1199.2),
+    ["Хэллоуинский цирк"] = Vector3.new(-316.9, 36.7, -1705.2)
+}
+
+local selectedHalloweenPreset = "Новая точка Хэл. Ивента"
+
+HalloweenTab:CreateDropdown({
+   Name = "Выберите локацию ивента",
+   Options = {
+       "Новая точка Хэл. Ивента",
+       "Хэллоуинский отель",
+       "Гробница",
+       "Хэллоуинский цирк"
+   },
+   CurrentOption = {"Новая точка Хэл. Ивента"},
+   MultipleOptions = false,
+   Flag = "HalloweenLocationsDropdown",
+   Callback = function(Option)
+      selectedHalloweenPreset = Option[1]
+   end,
+})
+
+HalloweenTab:CreateButton({
+   Name = "Телепортироваться на ивент",
+   Callback = function()
+      local targetPos = halloweenLocations[selectedHalloweenPreset]
+      if targetPos then
+          teleportTo(CFrame.new(targetPos))
+          Rayfield:Notify({
+             Title = "Хэллоуин Телепорт",
+             Content = "Перемещение в: " .. selectedHalloweenPreset,
+             Duration = 3,
+             Image = 4483362458,
+          })
+      end
+   end,
+})
+
+-- ==========================================
+-- ВКЛАДКА 2: MAIN
+-- ==========================================
+local MainTab = Window:CreateTab("Main", 4483362458)
+
+MainTab:CreateSection("Настройки игрока")
+
+MainTab:CreateSlider({
+   Name = "Скорость ходьбы (WalkSpeed)",
+   Range = {16, 250},
+   Increment = 1,
+   Suffix = " Speed",
+   CurrentValue = 16,
+   Flag = "WalkSpeedSlider",
+   Callback = function(Value)
+      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+         LocalPlayer.Character.Humanoid.WalkSpeed = Value
+      end
+   end,
+})
+
+MainTab:CreateSlider({
+   Name = "Сила прыжка (JumpPower)",
+   Range = {50, 300},
+   Increment = 5,
+   Suffix = " Power",
+   CurrentValue = 50,
+   Flag = "JumpPowerSlider",
+   Callback = function(Value)
+      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+         LocalPlayer.Character.Humanoid.JumpPower = Value
+      end
    end,
 })
 
@@ -151,24 +236,62 @@ MainTab:CreateKeybind({
 })
 
 -- ==========================================
--- ВКЛАДКА: TELEPORTS (ТЕЛЕПОРТАЦИЯ)
--- ВКЛАДКА: TELEPORTS (СВОИ ТОЧКИ)
+-- ВКЛАДКА 3: TELEPORTS
 -- ==========================================
 local TeleportTab = Window:CreateTab("Teleports", 4483362458)
 
-TeleportTab:CreateSection("Переход в Главный Город")
-TeleportTab:CreateSection("Сохранение собственных точек")
+TeleportTab:CreateSection("Основные Локации Города")
+
+local mainLocations = {
+    ["Больница"] = Vector3.new(-214.9, 45.4, -1524.2),
+    ["Школа"] = Vector3.new(-304.9, 39.3, -1495.3),
+    ["Пиццерия"] = Vector3.new(-133.7, 39.9, -1662.2),
+    ["Кошачье кафе"] = Vector3.new(-27.5, 42.0, -1646.5),
+    ["Магазин питомцев"] = Vector3.new(-245.5, 34.2, -1479.1),
+    ["Кемпинг"] = Vector3.new(-34.8, 44.0, -1087.6),
+    ["Пляж"] = Vector3.new(-594.3, 35.6, -1472.4)
+}
+
+local selectedMainPreset = "Больница"
+
+TeleportTab:CreateDropdown({
+   Name = "Выберите локацию",
+   Options = {
+       "Больница",
+       "Школа",
+       "Пиццерия",
+       "Кошачье кафе",
+       "Магазин питомцев",
+       "Кемпинг",
+       "Пляж"
+   },
+   CurrentOption = {"Больница"},
+   MultipleOptions = false,
+   Flag = "MainLocationsDropdown",
+   Callback = function(Option)
+      selectedMainPreset = Option[1]
+   end,
+})
 
 TeleportTab:CreateButton({
-   Name = "Загрузить Главный Город (Main Map)",
+   Name = "Телепортироваться",
    Callback = function()
-      loadMainMap()
-      Rayfield:Notify({
-         Title = "Телепорт",
-         Content = "Загружаем основной мир...",
-         Duration = 3,
-         Image = 4483362458,
-      })
+      local targetPos = mainLocations[selectedMainPreset]
+      if targetPos then
+          teleportTo(CFrame.new(targetPos))
+          Rayfield:Notify({
+             Title = "Телепорт",
+             Content = "Вы телепортированы в: " .. selectedMainPreset,
+             Duration = 3,
+             Image = 4483362458,
+          })
+      end
+   end,
+})
+
+-- --- СЕКЦИЯ: СОБСТВЕННЫЕ ТОЧКИ ---
+TeleportTab:CreateSection("Сохранение собственных точек")
+
 local newWaypointName = "Точка 1"
 local selectedWaypoint = ""
 
@@ -184,18 +307,14 @@ TeleportTab:CreateInput({
 local coordsInput = nil
 
 TeleportTab:CreateButton({
-   Name = "Подняться на карту (Выбраться из пустоты)",
    Name = "Сохранить текущую позицию",
    Callback = function()
       if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-         local currentCFrame = LocalPlayer.Character.HumanoidRootPart.CFrame
-         LocalPlayer.Character.HumanoidRootPart.CFrame = currentCFrame + Vector3.new(0, 500, 0)
           local pos = LocalPlayer.Character.HumanoidRootPart.Position
           local posStr = string.format("%.1f, %.1f, %.1f", pos.X, pos.Y, pos.Z)
           
           customWaypoints[newWaypointName] = LocalPlayer.Character.HumanoidRootPart.CFrame
           
-          -- Обновляем список выбора
           local keys = {}
           for k in pairs(customWaypoints) do
               table.insert(keys, k)
@@ -218,25 +337,6 @@ TeleportTab:CreateButton({
    end,
 })
 
-TeleportTab:CreateSection("Точные координаты (Основная карта)")
-
--- Координаты с учетом реальной высоты карты в Adopt Me
-local locations = {
-    ["Центр / Nursery"] = Vector3.new(-242, 30, -1742),
-    ["Больница (Hospital)"] = Vector3.new(-290, 30, -1770),
-    ["Школа (School)"] = Vector3.new(-330, 30, -1450),
-    ["Зоомагазин (Pet Shop)"] = Vector3.new(-110, 30, -1650),
-    ["Игровая площадка (Playground)"] = Vector3.new(-215, 30, -1660),
-    ["Пляж (Beach)"] = Vector3.new(-980, 25, -1400),
-    ["Пиццерия (Pizza Shop)"] = Vector3.new(-120, 30, -1350)
-}
-
-local selectedLocation = "Центр / Nursery"
-
-TeleportTab:CreateDropdown({
-   Name = "Выберите локацию",
-   Options = {"Центр / Nursery", "Больница (Hospital)", "Школа (School)", "Зоомагазин (Pet Shop)", "Игровая площадка (Playground)", "Пляж (Beach)", "Пиццерия (Pizza Shop)"},
-   CurrentOption = {"Центр / Nursery"},
 TeleportTab:CreateSection("Управление точками")
 
 waypointDropdown = TeleportTab:CreateDropdown({
@@ -244,10 +344,8 @@ waypointDropdown = TeleportTab:CreateDropdown({
    Options = {"Нет сохраненных точек"},
    CurrentOption = {"Нет сохраненных точек"},
    MultipleOptions = false,
-   Flag = "TeleportDropdown",
    Flag = "CustomWaypointsDropdown",
    Callback = function(Option)
-      selectedLocation = Option[1]
       selectedWaypoint = Option[1]
       local cf = customWaypoints[selectedWaypoint]
       if cf and coordsInput then
@@ -265,18 +363,13 @@ coordsInput = TeleportTab:CreateInput({
 })
 
 TeleportTab:CreateButton({
-   Name = "Телепортироваться",
    Name = "Телепортироваться к выбранной точке",
    Callback = function()
-      local targetPos = locations[selectedLocation]
-      if targetPos then
-          teleportTo(CFrame.new(targetPos))
       local cf = customWaypoints[selectedWaypoint]
       if cf then
           teleportTo(cf)
           Rayfield:Notify({
              Title = "Телепорт",
-             Content = "Перемещение в: " .. selectedLocation,
              Content = "Телепортированы на точку: " .. selectedWaypoint,
              Duration = 3,
              Image = 4483362458,
@@ -288,11 +381,17 @@ TeleportTab:CreateButton({
              Duration = 3,
              Image = 4483362458,
           })
-@@ -151,14 +295,13 @@ TeleportTab:CreateButton({
+      end
+   end,
+})
+
+TeleportTab:CreateSection("Универсальный телепорт")
+
+TeleportTab:CreateButton({
+   Name = "Клик-Телепорт (Ctrl + ЛКМ)",
    Callback = function()
       Rayfield:Notify({
          Title = "Click TP",
-         Content = "Зажмите Ctrl и нажмите ЛКМ по поверхности.",
          Content = "Зажмите Ctrl и кликните по поверхности.",
          Duration = 4,
          Image = 4483362458,
@@ -300,7 +399,79 @@ TeleportTab:CreateButton({
    end,
 })
 
--- Логика телепорта по Ctrl + Click
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.UserInputType == Enum.UserInputType.MouseButton1 and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
         local mouse = LocalPlayer:GetMouse()
+        if mouse.Hit then
+            teleportTo(mouse.Hit + Vector3.new(0, 3, 0))
+        end
+    end
+end)
+
+-- ==========================================
+-- ВКЛАДКА 4: AUTO FARM (ADOPT ME!)
+-- ==========================================
+local FarmTab = Window:CreateTab("Auto Farm", 4483362458)
+
+FarmTab:CreateSection("Автофарм питомцев")
+
+FarmTab:CreateToggle({
+   Name = "Авто-выполнение потребностей",
+   CurrentValue = false,
+   Flag = "AutoPetFarmToggle",
+   Callback = function(Value)
+      autoFarmPet = Value
+      if autoFarmPet then
+         Rayfield:Notify({
+            Title = "xryak Auto Farm",
+            Content = "Автофарм запущен!",
+            Duration = 3,
+            Image = 4483362458,
+         })
+      else
+         Rayfield:Notify({
+            Title = "xryak Auto Farm",
+            Content = "Автофарм остановлен.",
+            Duration = 3,
+            Image = 4483362458,
+         })
+      end
+   end,
+})
+
+-- Функция автоматического поиска и выполнения нужд
+local function doPetFarm()
+   pcall(function()
+      local API = ReplicatedStorage:FindFirstChild("API")
+      if not API then return end
+
+      for _, remote in pairs(API:GetChildren()) do
+         if remote:IsA("RemoteFunction") or remote:IsA("RemoteEvent") then
+            if string.find(string.lower(remote.Name), "pet") or string.find(string.lower(remote.Name), "task") then
+               if remote:IsA("RemoteFunction") then
+                  remote:InvokeServer("sleepy")
+                  remote:InvokeServer("hungry")
+               end
+            end
+         end
+      end
+   end)
+end
+
+-- Фоновый поток автофарма
+task.spawn(function()
+   while true do
+      if autoFarmPet then
+         doPetFarm()
+      end
+      task.wait(5)
+   end
+end)
+
+-- Уведомление
+Rayfield:Notify({
+   Title = "xryak Hub",
+   Content = "Скрипт готов к работе!",
+   Duration = 5,
+   Image = 4483362458,
+})
